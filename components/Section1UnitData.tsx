@@ -72,29 +72,31 @@ export default function Section1UnitData({
     }
   };
 
-  const handleVinDecode = async () => {
+  // TODO: VIN lookup for previous evaluations - currently returns empty
+  const handleVinLookup = async () => {
     if (!data.vin.trim() || data.vin.length !== 17) return;
 
     setIsLoadingVin(true);
     setLookupError(null);
 
     try {
-      const response = await fetch(`/api/vin/decode?vin=${encodeURIComponent(data.vin)}`);
+      const response = await fetch(`/api/vin/lookup?vin=${encodeURIComponent(data.vin)}`);
 
       if (!response.ok) {
-        throw new Error('VIN decode failed');
+        throw new Error('VIN lookup failed');
       }
 
       const result = await response.json();
 
-      onUpdate({
-        year: result.year || data.year,
-        manufacturer: result.manufacturer || data.manufacturer,
-        make: result.make || data.make,
-        model: result.model || data.model,
-      });
+      // TODO: Handle previous evaluations when implemented
+      if (result.evaluations && result.evaluations.length > 0) {
+        // Future: show list of previous evaluations for this VIN
+        alert('Previous evaluations found - feature coming soon');
+      } else {
+        setLookupError('No previous evaluations found for this VIN');
+      }
     } catch {
-      setLookupError('Failed to decode VIN');
+      setLookupError('Failed to lookup VIN');
     } finally {
       setIsLoadingVin(false);
     }
@@ -236,7 +238,7 @@ export default function Section1UnitData({
           <div className="flex items-end">
             <button
               type="button"
-              onClick={handleVinDecode}
+              onClick={handleVinLookup}
               disabled={data.vin.length !== 17 || isLoadingVin}
               className={`px-3 py-2 text-xs font-bold rounded-md transition-all ${
                 data.vin.length === 17 && !isLoadingVin
@@ -244,7 +246,7 @@ export default function Section1UnitData({
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
             >
-              {isLoadingVin ? '...' : 'Decode'}
+              {isLoadingVin ? '...' : 'Lookup'}
             </button>
           </div>
         </div>
