@@ -1,7 +1,7 @@
 import { config } from "dotenv";
 import { defineConfig } from "drizzle-kit";
 
-config({ path: ".env" });
+config({ path: ".env.local" });
 
 const dbUrl = process.env.DATABASE_URL;
 if (!dbUrl) {

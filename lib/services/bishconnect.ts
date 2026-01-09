@@ -76,7 +76,12 @@ async function getAccessToken(): Promise<string> {
     );
   }
 
-  const data: TokenResponse = await response.json();
+  let data: TokenResponse;
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error("Invalid JSON response from BishConnect auth");
+  }
 
   cachedToken = {
     token: data.access_token,
@@ -123,5 +128,9 @@ export async function fetchTradeValue(
     );
   }
 
-  return response.json();
+  try {
+    return await response.json();
+  } catch {
+    throw new Error("Invalid JSON response from BishConnect trade-value API");
+  }
 }

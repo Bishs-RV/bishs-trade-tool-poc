@@ -41,12 +41,18 @@ export async function decodeVin(vin: string): Promise<VinDecodeResult> {
     throw new Error(`NHTSA API error: ${response.status} ${response.statusText}`);
   }
 
-  const data: NHTSAResponse = await response.json();
+  let data: NHTSAResponse;
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error("Invalid JSON response from NHTSA API");
+  }
 
   const yearStr = getVariableValue(data.Results, "Model Year");
+  const yearNum = yearStr ? parseInt(yearStr, 10) : NaN;
 
   return {
-    year: yearStr ? parseInt(yearStr, 10) : null,
+    year: !isNaN(yearNum) ? yearNum : null,
     make: getVariableValue(data.Results, "Make"),
     model: getVariableValue(data.Results, "Model"),
     manufacturer: getVariableValue(data.Results, "Manufacturer Name"),

@@ -139,7 +139,12 @@ export default function Home() {
       throw new Error(errorMessage);
     }
 
-    const result = await response.json();
+    let result;
+    try {
+      result = await response.json();
+    } catch {
+      throw new Error('Invalid JSON response from trade value API');
+    }
 
     // Update calculated values with trade-in and retail from BishConnect
     const newCalc = {
@@ -166,9 +171,11 @@ export default function Home() {
       additionalPrepCost: data.additionalPrepCost,
     };
 
-    console.log('--- FINAL VALUATION SUBMITTED ---');
-    console.log(JSON.stringify(finalData, null, 2));
-    alert('Valuation submitted! Check console for details.');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('--- FINAL VALUATION SUBMITTED ---');
+      console.log(JSON.stringify(finalData, null, 2));
+    }
+    alert('Valuation submitted!');
   };
 
   return (
