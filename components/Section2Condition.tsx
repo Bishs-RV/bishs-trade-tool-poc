@@ -2,6 +2,7 @@
 
 import { TradeData, CalculatedValues } from '@/lib/types';
 import { formatCurrency } from '@/lib/calculations';
+import { Slider } from '@/components/ui/slider';
 
 interface Section2Props {
   data: TradeData;
@@ -44,23 +45,32 @@ export default function Section2Condition({
         <div className="space-y-6">
           {/* Combined Condition Score 1-9 */}
           <div className="bg-gradient-to-br from-slate-50 to-gray-50 p-4 rounded-xl border border-slate-200">
-            <label htmlFor="condition-score" className="block text-sm font-bold text-gray-800 mb-2">
-              Condition Score (<span className="text-blue-600">1-9 Scale</span>)
-            </label>
-            <input
-              type="range"
-              id="condition-score"
-              min="1"
-              max="9"
-              step="1"
-              value={data.conditionScore}
-              onChange={(e) => onUpdate({ conditionScore: parseInt(e.target.value) })}
-              className="mt-4 w-full h-2 bg-gradient-to-r from-slate-200 to-slate-300 rounded-lg appearance-none cursor-pointer accent-blue-600 shadow-inner"
+            <div className="flex items-center justify-between mb-4">
+              <label className="text-sm font-bold text-gray-800">
+                Condition Score (<span className="text-blue-600">1-9 Scale</span>)
+              </label>
+              <span className="text-2xl font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-lg">
+                {data.conditionScore}
+              </span>
+            </div>
+            <Slider
+              value={[data.conditionScore]}
+              onValueChange={(values) => {
+                const value = values[0];
+                if (typeof value === 'number') {
+                  onUpdate({ conditionScore: value });
+                }
+              }}
+              min={1}
+              max={9}
+              step={1}
+              className="py-4"
+              disabled={isLocked}
             />
-            <div className="flex justify-between text-xs text-gray-500 mt-2">
-              <span>1 (Poor)</span>
-              <span className="font-bold text-blue-900 text-base">{data.conditionScore}</span>
-              <span>9 (Excellent)</span>
+            <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <span className="text-red-600 font-medium">1 (Poor)</span>
+              <span className="text-yellow-600 font-medium">5 (Fair)</span>
+              <span className="text-green-600 font-medium">9 (Excellent)</span>
             </div>
           </div>
 
