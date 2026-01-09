@@ -10,6 +10,7 @@ export interface TradeData {
   stockNumber: string;
   location: string;
   year: number | null;
+  manufacturer: string;
   make: string;
   model: string;
   vin: string;

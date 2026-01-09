@@ -1,7 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { TradeData, CalculatedValues } from '@/lib/types';
-import { LOCATIONS, RV_TYPE_OPTIONS, RV_MAKES, RV_MODELS, isMotorized } from '@/lib/constants';
+import { LOCATIONS, RV_TYPE_OPTIONS, isMotorized } from '@/lib/constants';
 import { formatCurrency } from '@/lib/calculations';
 
 interface Section1Props {
@@ -9,6 +10,7 @@ interface Section1Props {
   calculated: CalculatedValues;
   onUpdate: (updates: Partial<TradeData>) => void;
   onLookup: () => void;
+  onGetTradeValue: () => Promise<void>;
   isLookupComplete: boolean;
 }
 
@@ -17,16 +19,100 @@ export default function Section1UnitData({
   calculated,
   onUpdate,
   onLookup,
+  onGetTradeValue,
   isLookupComplete,
 }: Section1Props) {
+  const [isLoadingStock, setIsLoadingStock] = useState(false);
+  const [isLoadingVin, setIsLoadingVin] = useState(false);
+  const [isLoadingTradeValue, setIsLoadingTradeValue] = useState(false);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+
   const isMileageEnabled = isMotorized(data.rvType);
-  
-  const isLookupReady = 
+
+  const isLookupReady =
     data.year !== null &&
-    data.make.trim() !== '' &&
-    data.model.trim() !== '' &&
-    data.vin.trim() !== '' &&
-    data.rvType !== null;
+    data.manufacturer.trim() !== '' &&
+    data.model.trim() !== '';
+
+  const handleStockLookup = async () => {
+    if (!data.stockNumber.trim()) return;
+
+    setIsLoadingStock(true);
+    setLookupError(null);
+
+    try {
+      const response = await fetch(`/api/inventory/lookup?stockNumber=${encodeURIComponent(data.stockNumber)}`);
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          setLookupError('Stock number not found');
+          return;
+        }
+        throw new Error('Lookup failed');
+      }
+
+      const unit = await response.json();
+
+      const parsedMileage = unit.odometer ? parseInt(unit.odometer, 10) : NaN;
+      const parsedPrice = unit.msrp ? parseFloat(unit.msrp) : NaN;
+
+      onUpdate({
+        vin: unit.vin || data.vin,
+        year: unit.modelYear || data.year,
+        manufacturer: unit.manufacturer || data.manufacturer,
+        make: unit.make || data.make,
+        model: unit.model || data.model,
+        mileage: !isNaN(parsedMileage) ? parsedMileage : data.mileage,
+        originalListPrice: !isNaN(parsedPrice) ? parsedPrice : data.originalListPrice,
+      });
+    } catch {
+      setLookupError('Failed to lookup stock number');
+    } finally {
+      setIsLoadingStock(false);
+    }
+  };
+
+  const handleVinDecode = async () => {
+    if (!data.vin.trim() || data.vin.length !== 17) return;
+
+    setIsLoadingVin(true);
+    setLookupError(null);
+
+    try {
+      const response = await fetch(`/api/vin/decode?vin=${encodeURIComponent(data.vin)}`);
+
+      if (!response.ok) {
+        throw new Error('VIN decode failed');
+      }
+
+      const result = await response.json();
+
+      onUpdate({
+        year: result.year || data.year,
+        manufacturer: result.manufacturer || data.manufacturer,
+        make: result.make || data.make,
+        model: result.model || data.model,
+      });
+    } catch {
+      setLookupError('Failed to decode VIN');
+    } finally {
+      setIsLoadingVin(false);
+    }
+  };
+
+  const handleGetTradeValue = async () => {
+    setIsLoadingTradeValue(true);
+    setLookupError(null);
+
+    try {
+      await onGetTradeValue();
+      onLookup();
+    } catch (error) {
+      setLookupError(error instanceof Error ? error.message : 'Failed to get trade value');
+    } finally {
+      setIsLoadingTradeValue(false);
+    }
+  };
 
   return (
     <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 h-full">
@@ -46,7 +132,6 @@ export default function Section1UnitData({
             <button
               type="button"
               onClick={() => {
-                // Mock lookup - in production this would search for prior valuations
                 if (data.customerPhone || data.customerEmail) {
                   alert('Customer lookup feature coming soon! This will search for prior valuations by phone/email.');
                 }
@@ -101,9 +186,9 @@ export default function Section1UnitData({
           </div>
         </div>
 
-        {/* Stock Number and VIN on same line */}
-        <div className="grid grid-cols-2 gap-2">
-          <div>
+        {/* Stock Number with Lookup Button */}
+        <div className="flex gap-2">
+          <div className="flex-1">
             <label htmlFor="stock-number" className="block text-xs font-semibold text-gray-700 mb-0.5">
               Stock Number
             </label>
@@ -116,8 +201,25 @@ export default function Section1UnitData({
               onChange={(e) => onUpdate({ stockNumber: e.target.value })}
             />
           </div>
+          <div className="flex items-end">
+            <button
+              type="button"
+              onClick={handleStockLookup}
+              disabled={!data.stockNumber.trim() || isLoadingStock}
+              className={`px-3 py-2 text-xs font-bold rounded-md transition-all ${
+                data.stockNumber.trim() && !isLoadingStock
+                  ? 'bg-green-600 text-white hover:bg-green-700'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              {isLoadingStock ? '...' : 'Lookup'}
+            </button>
+          </div>
+        </div>
 
-          <div>
+        {/* VIN with Decode Button */}
+        <div className="flex gap-2">
+          <div className="flex-1">
             <label htmlFor="vin" className="block text-xs font-semibold text-gray-700 mb-0.5">
               VIN
             </label>
@@ -127,12 +229,32 @@ export default function Section1UnitData({
               maxLength={17}
               className="mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300 font-mono"
               placeholder="17-Digit VIN"
-              required
               value={data.vin}
               onChange={(e) => onUpdate({ vin: e.target.value.toUpperCase() })}
             />
           </div>
+          <div className="flex items-end">
+            <button
+              type="button"
+              onClick={handleVinDecode}
+              disabled={data.vin.length !== 17 || isLoadingVin}
+              className={`px-3 py-2 text-xs font-bold rounded-md transition-all ${
+                data.vin.length === 17 && !isLoadingVin
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              {isLoadingVin ? '...' : 'Decode'}
+            </button>
+          </div>
         </div>
+
+        {/* Error Display */}
+        {lookupError && (
+          <div className="text-xs text-red-600 bg-red-50 p-2 rounded-md">
+            {lookupError}
+          </div>
+        )}
 
         {/* Location Dropdown */}
         <div>
@@ -178,7 +300,7 @@ export default function Section1UnitData({
               className="mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300"
               required
               value={data.rvType}
-              onChange={(e) => onUpdate({ rvType: e.target.value as any, mileage: null })}
+              onChange={(e) => onUpdate({ rvType: e.target.value as TradeData['rvType'], mileage: null })}
             >
               {RV_TYPE_OPTIONS.map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -187,40 +309,51 @@ export default function Section1UnitData({
           </div>
         </div>
 
+        {/* Manufacturer - Free Form */}
         <div>
-          <label htmlFor="make" className="block text-xs font-semibold text-gray-700 mb-0.5">
-            Make <span className="text-red-600">*</span>
+          <label htmlFor="manufacturer" className="block text-xs font-semibold text-gray-700 mb-0.5">
+            Manufacturer <span className="text-red-600">*</span>
           </label>
-          <select
-            id="make"
-            className="mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300"
+          <input
+            type="text"
+            id="manufacturer"
+            className="mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300"
+            placeholder="e.g., Forest River, Thor, Winnebago"
             required
-            value={data.make}
-            onChange={(e) => onUpdate({ make: e.target.value })}
-          >
-            <option value="">Select Make</option>
-            {RV_MAKES.map(make => (
-              <option key={make} value={make}>{make}</option>
-            ))}
-          </select>
+            value={data.manufacturer}
+            onChange={(e) => onUpdate({ manufacturer: e.target.value })}
+          />
         </div>
 
+        {/* Make - Free Form */}
+        <div>
+          <label htmlFor="make" className="block text-xs font-semibold text-gray-700 mb-0.5">
+            Make
+          </label>
+          <input
+            type="text"
+            id="make"
+            className="mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300"
+            placeholder="e.g., Rockwood, Jayco, Airstream"
+            value={data.make}
+            onChange={(e) => onUpdate({ make: e.target.value })}
+          />
+        </div>
+
+        {/* Model - Free Form */}
         <div>
           <label htmlFor="model" className="block text-xs font-semibold text-gray-700 mb-0.5">
             Model/Floorplan <span className="text-red-600">*</span>
           </label>
-          <select
+          <input
+            type="text"
             id="model"
-            className="mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300"
+            className="mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300"
+            placeholder="e.g., Ultra Lite 2608BS"
             required
             value={data.model}
             onChange={(e) => onUpdate({ model: e.target.value })}
-          >
-            <option value="">Select Model</option>
-            {RV_MODELS.map(model => (
-              <option key={model} value={model}>{model}</option>
-            ))}
-          </select>
+          />
         </div>
 
         {/* Mileage field - enabled/disabled by RV type */}
@@ -232,7 +365,7 @@ export default function Section1UnitData({
             type="number"
             id="mileage"
             className={`mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm transition-all ${
-              isMileageEnabled 
+              isMileageEnabled
                 ? 'bg-white text-gray-900 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 hover:border-blue-300'
                 : 'bg-gray-100 text-gray-500 cursor-not-allowed'
             }`}
@@ -269,23 +402,27 @@ export default function Section1UnitData({
           </span>
         </div>
 
-        {/* Lookup Button */}
+        {/* Get Trade Value Button */}
         <button
           type="button"
-          onClick={onLookup}
-          disabled={!isLookupReady || isLookupComplete}
+          onClick={handleGetTradeValue}
+          disabled={!isLookupReady || isLookupComplete || isLoadingTradeValue}
           className={`w-full py-2 mt-2 text-sm text-white font-bold rounded-lg shadow-md transition-all transform ${
-            isLookupReady && !isLookupComplete
+            isLookupReady && !isLookupComplete && !isLoadingTradeValue
               ? 'bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 hover:shadow-2xl hover:scale-[1.02] active:scale-[0.98]'
               : 'bg-gray-400 cursor-not-allowed opacity-60'
           }`}
         >
-          {isLookupComplete ? (
+          {isLoadingTradeValue ? (
             <span className="flex items-center justify-center gap-2">
-              <span className="text-xl">✓</span> Unit Data Loaded
+              <span className="animate-spin">⟳</span> Getting Trade Value...
+            </span>
+          ) : isLookupComplete ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="text-xl">✓</span> Trade Value Loaded
             </span>
           ) : (
-            'Lookup Unit Data'
+            'Get Trade Value'
           )}
         </button>
       </div>
