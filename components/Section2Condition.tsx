@@ -3,6 +3,7 @@
 import { TradeData, CalculatedValues } from '@/lib/types';
 import { formatCurrency } from '@/lib/calculations';
 import { Slider } from '@/components/ui/slider';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface Section2Props {
   data: TradeData;
@@ -73,6 +74,52 @@ export default function Section2Condition({
               <span className="text-green-600 font-medium">9 (Excellent)</span>
             </div>
           </div>
+
+          {/* Active Cost Tier Info */}
+          {calculated.activePrepTier && (
+            <Card className="bg-gradient-to-br from-blue-50 to-slate-50 border-blue-200">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center justify-between">
+                  <span className="text-gray-700">Active Cost Tier</span>
+                  <span className="text-blue-600 font-black text-lg">
+                    {calculated.activePrepTier.pdiType}
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0 space-y-3">
+                <p className="text-xs text-gray-600">
+                  Based on JD Power Trade-In: <span className="font-bold text-gray-900">{formatCurrency(calculated.jdPowerTradeIn)}</span>
+                  <span className="text-gray-500 ml-1">(Range: {calculated.activePrepTier.invoiceRange})</span>
+                </p>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="flex justify-between bg-white/50 rounded px-2 py-1">
+                    <span className="text-gray-600">PDI Labor:</span>
+                    <span className="font-semibold">{formatCurrency(calculated.activePrepTier.pdiLabor)}</span>
+                  </div>
+                  <div className="flex justify-between bg-white/50 rounded px-2 py-1">
+                    <span className="text-gray-600">Base Recon:</span>
+                    <span className="font-semibold">{formatCurrency(calculated.activePrepTier.recon)}</span>
+                  </div>
+                  <div className="flex justify-between bg-white/50 rounded px-2 py-1">
+                    <span className="text-gray-600">Get Ready:</span>
+                    <span className="font-semibold">{formatCurrency(calculated.activePrepTier.getReady)}</span>
+                  </div>
+                  <div className="flex justify-between bg-white/50 rounded px-2 py-1">
+                    <span className="text-gray-600">Orientation:</span>
+                    <span className="font-semibold">{formatCurrency(calculated.activePrepTier.orientation)}</span>
+                  </div>
+                  <div className="flex justify-between bg-white/50 rounded px-2 py-1">
+                    <span className="text-gray-600">Detail:</span>
+                    <span className="font-semibold">{formatCurrency(calculated.activePrepTier.detail)}</span>
+                  </div>
+                  <div className="flex justify-between bg-white/50 rounded px-2 py-1">
+                    <span className="text-gray-600">Supplies:</span>
+                    <span className="font-semibold">{formatCurrency(calculated.activePrepTier.shopSupplies)}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* NOTES & MANUAL COST OVERRIDE */}
           <div className="p-3 bg-gradient-to-br from-gray-50 to-slate-50 rounded-lg border border-gray-200 space-y-2">
