@@ -73,6 +73,26 @@ export default function Section2Condition({
               <span className="text-yellow-600 font-medium">5 (Fair)</span>
               <span className="text-green-600 font-medium">9 (Excellent)</span>
             </div>
+
+            {/* Recon Penalty Indicator */}
+            {data.conditionScore < 9 && (
+              <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded-lg">
+                <p className="text-xs text-amber-800">
+                  <span className="font-bold">Recon Penalty:</span>{' '}
+                  +{formatCurrency((9 - data.conditionScore) * 500)} added to base recon
+                  <span className="text-amber-600 ml-1">
+                    ({9 - data.conditionScore} {9 - data.conditionScore === 1 ? 'point' : 'points'} below 9 × $500)
+                  </span>
+                </p>
+              </div>
+            )}
+            {data.conditionScore === 9 && (
+              <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-xs text-green-800">
+                  <span className="font-bold">No Recon Penalty</span> — Excellent condition
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Active Cost Tier Info */}
