@@ -46,6 +46,7 @@ export function calculateValuation(
     finalTradeOffer: 0,
     calculatedMarginAmount: 0,
     calculatedMarginPercent: 0,
+    activePrepTier: null,
   };
 
   // Calculate Average Comp Price
@@ -78,6 +79,7 @@ export function calculateValuation(
 
   // Get the appropriate prep cost tier based on JD Power Trade-In value
   const prepTier = getPrepCostTier(calculated.jdPowerTradeIn);
+  calculated.activePrepTier = prepTier;
 
   // PDI Cost from tier
   calculated.pdiCost = prepTier.pdiLabor;

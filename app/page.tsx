@@ -53,6 +53,7 @@ export default function Home() {
     finalTradeOffer: 0,
     calculatedMarginAmount: 0,
     calculatedMarginPercent: 0,
+    activePrepTier: null,
   });
 
   // Initial calculation on mount to set Trade-In % based on default margin
@@ -130,12 +131,6 @@ export default function Home() {
     console.log(JSON.stringify(finalData, null, 2));
     alert('Valuation submitted! Check console for details.');
   };
-
-  // Initial calculation on mount
-  useEffect(() => {
-    recalculate('initial-load');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-100 via-blue-50 to-gray-100 p-4 sm:p-8">
