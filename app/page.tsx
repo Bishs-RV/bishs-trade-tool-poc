@@ -10,6 +10,7 @@ import Section4Valuation from '@/components/Section4Valuation';
 
 export default function Home() {
   const [isLookupComplete, setIsLookupComplete] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [data, setData] = useState<TradeData>({
     customerName: '',
     customerPhone: '',
@@ -110,25 +111,29 @@ export default function Home() {
     recalculate('lookup-complete', updates);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const finalData = {
-      stockNumber: data.stockNumber,
-      location: data.location,
-      finalOffer: calculated.finalTradeOffer,
-      marginAmount: calculated.calculatedMarginAmount,
-      marginPercent: calculated.calculatedMarginPercent,
-      totalUnitCosts: calculated.totalUnitCosts,
-      valuationNotes: data.valuationNotes,
-      rvType: data.rvType,
-      conditionScore: data.conditionScore,
-      additionalPrepCost: data.additionalPrepCost,
-    };
+    setIsSubmitting(true);
 
-    console.log('--- FINAL VALUATION SUBMITTED ---');
-    console.log(JSON.stringify(finalData, null, 2));
-    alert('Valuation submitted! Check console for details.');
+    try {
+      const response = await fetch('/api/evaluations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tradeData: data, calculated }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save evaluation');
+      }
+
+      const result = await response.json();
+      alert(`Evaluation saved successfully! ID: ${result.id}`);
+    } catch (error) {
+      console.error('Submit error:', error);
+      alert('Failed to save evaluation. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Initial calculation on mount
@@ -244,11 +249,11 @@ export default function Home() {
             <button
               type="submit"
               className="w-full py-5 text-xl text-white font-black rounded-2xl shadow-2xl bg-gradient-to-r from-slate-600 via-slate-700 to-slate-800 hover:from-slate-700 hover:via-slate-800 hover:to-slate-900 transition-all transform hover:scale-[1.02] active:scale-[0.98] border border-slate-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-              disabled={!isLookupComplete}
+              disabled={!isLookupComplete || isSubmitting}
             >
               <span className="flex items-center justify-center gap-3">
-                <span>SUBMIT VALUATION</span>
-                <span className="text-2xl">→</span>
+                <span>{isSubmitting ? 'SAVING...' : 'SUBMIT VALUATION'}</span>
+                {!isSubmitting && <span className="text-2xl">→</span>}
               </span>
             </button>
           </div>

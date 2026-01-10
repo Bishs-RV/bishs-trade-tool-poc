@@ -1,6 +1,6 @@
 'use client';
 
-import { TradeData, CalculatedValues } from '@/lib/types';
+import { TradeData, CalculatedValues, RVType } from '@/lib/types';
 import { LOCATIONS, RV_TYPE_OPTIONS, RV_MAKES, RV_MODELS, isMotorized } from '@/lib/constants';
 import { formatCurrency } from '@/lib/calculations';
 
@@ -178,7 +178,7 @@ export default function Section1UnitData({
               className="mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300"
               required
               value={data.rvType}
-              onChange={(e) => onUpdate({ rvType: e.target.value as any, mileage: null })}
+              onChange={(e) => onUpdate({ rvType: e.target.value as RVType, mileage: null })}
             >
               {RV_TYPE_OPTIONS.map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
