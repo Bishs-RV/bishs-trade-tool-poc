@@ -10,6 +10,7 @@ interface Section1Props {
   onUpdate: (updates: Partial<TradeData>) => void;
   onLookup: () => void;
   isLookupComplete: boolean;
+  isLoading?: boolean;
 }
 
 export default function Section1UnitData({
@@ -18,15 +19,16 @@ export default function Section1UnitData({
   onUpdate,
   onLookup,
   isLookupComplete,
+  isLoading = false,
 }: Section1Props) {
   const isMileageEnabled = isMotorized(data.rvType);
   
-  const isLookupReady = 
+  const isLookupReady =
     data.year !== null &&
     data.make.trim() !== '' &&
     data.model.trim() !== '' &&
-    data.vin.trim() !== '' &&
-    data.rvType !== null;
+    data.rvType !== null &&
+    data.jdPowerModelTrimId !== null;
 
   return (
     <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 h-full">
@@ -273,19 +275,23 @@ export default function Section1UnitData({
         <button
           type="button"
           onClick={onLookup}
-          disabled={!isLookupReady || isLookupComplete}
+          disabled={!isLookupReady || isLookupComplete || isLoading}
           className={`w-full py-2 mt-2 text-sm text-white font-bold rounded-lg shadow-md transition-all transform ${
-            isLookupReady && !isLookupComplete
+            isLookupReady && !isLookupComplete && !isLoading
               ? 'bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 hover:shadow-2xl hover:scale-[1.02] active:scale-[0.98]'
               : 'bg-gray-400 cursor-not-allowed opacity-60'
           }`}
         >
-          {isLookupComplete ? (
+          {isLoading ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="animate-spin">⏳</span> Loading...
+            </span>
+          ) : isLookupComplete ? (
             <span className="flex items-center justify-center gap-2">
               <span className="text-xl">✓</span> Unit Data Loaded
             </span>
           ) : (
-            'Lookup Unit Data'
+            'Get Trade Value'
           )}
         </button>
       </div>

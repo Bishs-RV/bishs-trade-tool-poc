@@ -10,19 +10,23 @@ import Section4Valuation from '@/components/Section4Valuation';
 
 export default function Home() {
   const [isLookupComplete, setIsLookupComplete] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [data, setData] = useState<TradeData>({
     customerName: '',
     customerPhone: '',
     customerEmail: '',
-    stockNumber: '5642',
+    stockNumber: '',
     location: 'BMT',
-    year: 2020,
-    make: 'Forest River',
-    model: 'Rockwood Ultra Lite',
-    vin: '5FBY26H52EGA78912',
+    year: null,
+    make: '',
+    model: '',
+    vin: '',
     rvType: 'FW',
     mileage: null,
-    originalListPrice: 85000,
+    originalListPrice: null,
+    jdPowerManufacturerId: null,
+    jdPowerModelTrimId: null,
     conditionScore: 8,
     majorIssues: '',
     unitAddOns: '',
@@ -99,43 +103,151 @@ export default function Home() {
     recalculate(driverId, updates);
   };
 
-  const handleLookup = () => {
-    setIsLookupComplete(true);
-    // Populate with mock data
-    const updates: Partial<TradeData> = {
-      avgListingPrice: 52000,
-      conditionScore: 8,
-      additionalPrepCost: 500,
-    };
-    recalculate('lookup-complete', updates);
+  const handleLookup = async () => {
+    if (!data.jdPowerModelTrimId) {
+      alert('Please select a model to get trade value');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Fetch trade value from BishConnect API
+      const params = new URLSearchParams({
+        modelTrimId: data.jdPowerModelTrimId.toString(),
+        condition: data.conditionScore.toString(),
+      });
+      if (data.mileage) {
+        params.set('mileage', data.mileage.toString());
+      }
+
+      const response = await fetch(`/api/trade-value?${params}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch trade value');
+      }
+
+      const result = await response.json();
+      if (typeof result.tradeValue !== 'number') {
+        throw new Error('Invalid API response');
+      }
+      const tradeValue = result.tradeValue;
+
+      // Update with real trade value and trigger recalculation
+      const updates: Partial<TradeData> = {
+        avgListingPrice: tradeValue * 1.15,
+      };
+
+      // Update calculated values with real JD Power trade-in
+      setCalculated(prev => ({
+        ...prev,
+        jdPowerTradeIn: tradeValue,
+        jdPowerRetailValue: tradeValue * 1.13,
+      }));
+
+      recalculate('lookup-complete', updates);
+      setIsLookupComplete(true);
+    } catch (error: unknown) {
+      console.error('Lookup error:', error);
+      alert('Failed to fetch trade value. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const finalData = {
-      stockNumber: data.stockNumber,
-      location: data.location,
-      finalOffer: calculated.finalTradeOffer,
-      marginAmount: calculated.calculatedMarginAmount,
-      marginPercent: calculated.calculatedMarginPercent,
-      totalUnitCosts: calculated.totalUnitCosts,
-      valuationNotes: data.valuationNotes,
-      rvType: data.rvType,
-      conditionScore: data.conditionScore,
-      additionalPrepCost: data.additionalPrepCost,
-    };
+    setIsSubmitting(true);
 
-    console.log('--- FINAL VALUATION SUBMITTED ---');
-    console.log(JSON.stringify(finalData, null, 2));
-    alert('Valuation submitted! Check console for details.');
+    try {
+      const payload = {
+        // Customer Info
+        customerName: data.customerName || undefined,
+        customerPhone: data.customerPhone || undefined,
+        customerEmail: data.customerEmail || undefined,
+
+        // Unit Data
+        stockNumber: data.stockNumber || undefined,
+        location: data.location || undefined,
+        year: data.year || undefined,
+        make: data.make || undefined,
+        model: data.model || undefined,
+        vin: data.vin || undefined,
+        rvType: data.rvType || undefined,
+        mileage: data.mileage || undefined,
+
+        // JD Power Data
+        jdPowerModelTrimId: data.jdPowerModelTrimId || undefined,
+        jdPowerManufacturerId: data.jdPowerManufacturerId || undefined,
+
+        // Condition Data
+        conditionScore: data.conditionScore,
+        majorIssues: data.majorIssues || undefined,
+        unitAddOns: data.unitAddOns || undefined,
+        additionalPrepCost: data.additionalPrepCost || undefined,
+
+        // Market Data
+        avgListingPrice: data.avgListingPrice || undefined,
+
+        // Valuation Inputs
+        tradeInPercent: data.tradeInPercent,
+        targetMarginPercent: data.targetMarginPercent,
+        retailPriceSource: data.retailPriceSource,
+        customRetailValue: data.customRetailValue || undefined,
+
+        // Calculated Outputs
+        jdPowerTradeIn: calculated.jdPowerTradeIn,
+        jdPowerRetailValue: calculated.jdPowerRetailValue,
+        pdiCost: calculated.pdiCost,
+        reconCost: calculated.reconCost,
+        soldPrepCost: calculated.soldPrepCost,
+        totalPrepCosts: calculated.totalPrepCosts,
+        bishTivBase: calculated.bishTIVBase,
+        totalUnitCosts: calculated.totalUnitCosts,
+        avgCompPrice: calculated.avgCompPrice,
+        calculatedRetailPrice: calculated.calculatedRetailPrice,
+        replacementCost: calculated.replacementCost,
+        activeRetailPrice: calculated.activeRetailPrice,
+        finalTradeOffer: calculated.finalTradeOffer,
+        calculatedMarginAmount: calculated.calculatedMarginAmount,
+        calculatedMarginPercent: calculated.calculatedMarginPercent,
+
+        // Notes
+        valuationNotes: data.valuationNotes || undefined,
+
+        // Audit
+        createdBy: 'trade-tool-user', // TODO: Replace with actual user from auth
+      };
+
+      const response = await fetch('/api/valuations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to save valuation';
+        try {
+          const error = await response.json();
+          errorMessage = error.error || errorMessage;
+        } catch {
+          // Response body is not valid JSON
+        }
+        throw new Error(errorMessage);
+      }
+
+      const result = await response.json();
+      if (!result.evaluation?.id) {
+        throw new Error('Invalid response from server');
+      }
+      console.log('Valuation saved:', result.evaluation);
+      alert(`Valuation saved successfully! ID: ${result.evaluation.id}`);
+    } catch (error: unknown) {
+      console.error('Submit error:', error);
+      const message = error instanceof Error ? error.message : 'Failed to save valuation';
+      alert(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
-
-  // Initial calculation on mount
-  useEffect(() => {
-    recalculate('initial-load');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-100 via-blue-50 to-gray-100 p-4 sm:p-8">
@@ -171,6 +283,7 @@ export default function Home() {
                 onUpdate={(updates) => handleUpdate(updates, 'trade-in-percent-slider')}
                 onLookup={handleLookup}
                 isLookupComplete={isLookupComplete}
+                isLoading={isLoading}
               />
             </div>
 
@@ -244,11 +357,20 @@ export default function Home() {
             <button
               type="submit"
               className="w-full py-5 text-xl text-white font-black rounded-2xl shadow-2xl bg-gradient-to-r from-slate-600 via-slate-700 to-slate-800 hover:from-slate-700 hover:via-slate-800 hover:to-slate-900 transition-all transform hover:scale-[1.02] active:scale-[0.98] border border-slate-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-              disabled={!isLookupComplete}
+              disabled={!isLookupComplete || isSubmitting}
             >
               <span className="flex items-center justify-center gap-3">
-                <span>SUBMIT VALUATION</span>
-                <span className="text-2xl">→</span>
+                {isSubmitting ? (
+                  <>
+                    <span className="animate-spin">⏳</span>
+                    <span>SAVING...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>SUBMIT VALUATION</span>
+                    <span className="text-2xl">→</span>
+                  </>
+                )}
               </span>
             </button>
           </div>

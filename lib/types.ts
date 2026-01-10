@@ -5,7 +5,7 @@ export interface TradeData {
   customerName: string;
   customerPhone: string;
   customerEmail: string;
-  
+
   // Section 1: Unit & Base Data
   stockNumber: string;
   location: string;
@@ -16,6 +16,10 @@ export interface TradeData {
   rvType: RVType;
   mileage: number | null;
   originalListPrice: number | null;
+
+  // JD Power IDs (for API lookups)
+  jdPowerManufacturerId: number | null;
+  jdPowerModelTrimId: number | null;
 
   // Section 2: Condition & Prep Costs
   conditionScore: number;
