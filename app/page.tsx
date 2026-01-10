@@ -14,15 +14,16 @@ export default function Home() {
     customerName: '',
     customerPhone: '',
     customerEmail: '',
-    stockNumber: '5642',
-    location: 'BMT',
-    year: 2020,
-    make: 'Forest River',
-    model: 'Rockwood Ultra Lite',
-    vin: '5FBY26H52EGA78912',
-    rvType: 'FW',
+    stockNumber: '',
+    location: '',
+    year: null,
+    manufacturer: '',
+    make: '',
+    model: '',
+    vin: '',
+    rvType: 'TT',
     mileage: null,
-    originalListPrice: 85000,
+    originalListPrice: null,
     conditionScore: 8,
     majorIssues: '',
     unitAddOns: '',
@@ -101,13 +102,57 @@ export default function Home() {
 
   const handleLookup = () => {
     setIsLookupComplete(true);
-    // Populate with mock data
-    const updates: Partial<TradeData> = {
-      avgListingPrice: 52000,
-      conditionScore: 8,
-      additionalPrepCost: 500,
+    recalculate('lookup-complete');
+  };
+
+  const handleGetTradeValue = async () => {
+    if (!data.year || !data.manufacturer || !data.model) {
+      throw new Error('Year, manufacturer, and model are required');
+    }
+
+    const params = new URLSearchParams({
+      year: data.year.toString(),
+      manufacturer: data.manufacturer,
+      model: data.model,
+    });
+
+    if (data.make) {
+      params.set('make', data.make);
+    }
+    if (data.mileage) {
+      params.set('mileage', data.mileage.toString());
+    }
+    if (data.conditionScore) {
+      params.set('condition', data.conditionScore.toString());
+    }
+
+    const response = await fetch(`/api/trade-value?${params.toString()}`);
+
+    if (!response.ok) {
+      let errorMessage = 'Failed to get trade value';
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorMessage;
+      } catch {
+        errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+      }
+      throw new Error(errorMessage);
+    }
+
+    let result;
+    try {
+      result = await response.json();
+    } catch {
+      throw new Error('Invalid JSON response from trade value API');
+    }
+
+    // Update calculated values with trade-in and retail from BishConnect
+    const newCalc = {
+      ...calculated,
+      jdPowerTradeIn: result.values?.trade_in || 0,
+      jdPowerRetailValue: result.values?.used_retail || 0,
     };
-    recalculate('lookup-complete', updates);
+    setCalculated(newCalc);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -126,9 +171,11 @@ export default function Home() {
       additionalPrepCost: data.additionalPrepCost,
     };
 
-    console.log('--- FINAL VALUATION SUBMITTED ---');
-    console.log(JSON.stringify(finalData, null, 2));
-    alert('Valuation submitted! Check console for details.');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('--- FINAL VALUATION SUBMITTED ---');
+      console.log(JSON.stringify(finalData, null, 2));
+    }
+    alert('Valuation submitted!');
   };
 
   return (
@@ -164,6 +211,7 @@ export default function Home() {
                 calculated={calculated}
                 onUpdate={(updates) => handleUpdate(updates, 'trade-in-percent-slider')}
                 onLookup={handleLookup}
+                onGetTradeValue={handleGetTradeValue}
                 isLookupComplete={isLookupComplete}
               />
             </div>
