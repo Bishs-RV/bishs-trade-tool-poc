@@ -55,16 +55,19 @@ export interface ComparableUnit {
 }
 
 export interface CalculatedValues {
-  // JD Power Values
+  // JD Power Values (raw from NADA)
   jdPowerTradeIn: number;
   jdPowerRetailValue: number;
-  
+
+  // Bish Adjusted Trade-In (after depreciation)
+  bishAdjustedTradeIn: number;
+
   // Prep Costs Breakdown
   pdiCost: number;
   reconCost: number;
   soldPrepCost: number;
   totalPrepCosts: number;
-  
+
   // Bish's Values
   bishTIVBase: number;
   totalUnitCosts: number;

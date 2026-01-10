@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { TradeData, CalculatedValues } from '@/lib/types';
-import { calculateValuation, calculateTradeInPercentFromMargin, DriverId } from '@/lib/calculations';
+import { calculateValuation, calculateTradeInPercentFromMargin, DriverId, TradeValues } from '@/lib/calculations';
 import Section1UnitData from '@/components/Section1UnitData';
 import Section2Condition from '@/components/Section2Condition';
 import Section3Market from '@/components/Section3Market';
@@ -12,7 +12,7 @@ export default function Home() {
   const [isLookupComplete, setIsLookupComplete] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [realTradeValue, setRealTradeValue] = useState<number | undefined>(undefined);
+  const [tradeValues, setTradeValues] = useState<TradeValues | undefined>(undefined);
   const [data, setData] = useState<TradeData>({
     customerName: '',
     customerPhone: '',
@@ -45,6 +45,7 @@ export default function Home() {
   const [calculated, setCalculated] = useState<CalculatedValues>({
     jdPowerTradeIn: 0,
     jdPowerRetailValue: 0,
+    bishAdjustedTradeIn: 0,
     pdiCost: 0,
     reconCost: 0,
     soldPrepCost: 0,
@@ -67,14 +68,14 @@ export default function Home() {
   }, []);
 
   // Recalculate whenever data changes
-  const recalculate = (driverId: DriverId, updates?: Partial<TradeData>, tradeValue?: number) => {
+  const recalculate = (driverId: DriverId, updates?: Partial<TradeData>, newTradeValues?: TradeValues) => {
     const newData = updates ? { ...data, ...updates } : data;
-    // Use provided tradeValue, or fall back to stored realTradeValue
-    const jdPowerTradeIn = tradeValue ?? realTradeValue;
+    // Use provided tradeValues, or fall back to stored tradeValues
+    const currentTradeValues = newTradeValues ?? tradeValues;
 
     // Handle slider inverse calculation
     if (driverId === 'margin-percent-slider' || driverId === 'initial-load') {
-      const newCalc = calculateValuation(newData, driverId, isLookupComplete, jdPowerTradeIn);
+      const newCalc = calculateValuation(newData, driverId, isLookupComplete, currentTradeValues);
       const newTradeInPercent = calculateTradeInPercentFromMargin(
         newCalc.totalUnitCosts,
         newCalc.finalTradeOffer
@@ -83,7 +84,7 @@ export default function Home() {
       setData({ ...newData, tradeInPercent: newTradeInPercent });
       setCalculated(newCalc);
     } else {
-      const newCalc = calculateValuation(newData, driverId, isLookupComplete, jdPowerTradeIn);
+      const newCalc = calculateValuation(newData, driverId, isLookupComplete, currentTradeValues);
 
       // Update target margin percent based on calculated margin
       if (driverId === 'trade-in-percent-slider' ||
@@ -114,7 +115,7 @@ export default function Home() {
 
     if (vehicleFieldsChanged && isLookupComplete) {
       setIsLookupComplete(false);
-      setRealTradeValue(undefined);
+      setTradeValues(undefined);
     }
 
     recalculate(driverId, updates);
@@ -143,20 +144,33 @@ export default function Home() {
       }
 
       const result = await response.json();
-      if (typeof result.tradeValue !== 'number' || !isFinite(result.tradeValue) || result.tradeValue <= 0) {
-        throw new Error('Invalid trade value from API');
-      }
-      const tradeValue = result.tradeValue;
+      console.log('[handleLookup] API response:', result);
 
-      // Store the real trade value for future recalculations
-      setRealTradeValue(tradeValue);
+      // Validate the response has required fields
+      if (typeof result.jdPowerTradeIn !== 'number' || !isFinite(result.jdPowerTradeIn) || result.jdPowerTradeIn <= 0) {
+        throw new Error('Invalid JD Power trade value from API');
+      }
+      if (typeof result.bishAdjustedTradeIn !== 'number' || !isFinite(result.bishAdjustedTradeIn) || result.bishAdjustedTradeIn <= 0) {
+        throw new Error('Invalid Bish adjusted trade value from API');
+      }
+
+      const newTradeValues: TradeValues = {
+        jdPowerTradeIn: result.jdPowerTradeIn,
+        bishAdjustedTradeIn: result.bishAdjustedTradeIn,
+        usedRetail: result.usedRetail,
+      };
+      console.log('[handleLookup] Trade values received:', newTradeValues);
+
+      // Store the trade values for future recalculations
+      setTradeValues(newTradeValues);
 
       // Update with real trade value and trigger recalculation
       const updates: Partial<TradeData> = {
-        avgListingPrice: tradeValue * 1.15,
+        avgListingPrice: newTradeValues.bishAdjustedTradeIn * 1.15,
       };
 
-      recalculate('lookup-complete', updates, tradeValue);
+      console.log('[handleLookup] Calling recalculate with tradeValues:', newTradeValues);
+      recalculate('lookup-complete', updates, newTradeValues);
       setIsLookupComplete(true);
     } catch (error: unknown) {
       console.error('Lookup error:', error);

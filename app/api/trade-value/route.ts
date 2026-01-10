@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
   }
 
   const mileageNum = mileage ? parseInt(mileage, 10) : undefined
-  if (mileage && isNaN(mileageNum!)) {
+  if (mileageNum !== undefined && isNaN(mileageNum)) {
     return NextResponse.json(
       { error: 'mileage must be a valid number' },
       { status: 400 }
@@ -41,13 +41,23 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const tradeValue = await getTradeValue({
+    console.log('[trade-value] Request params:', {
       modelTrimId: modelTrimIdNum,
       condition: conditionNum,
       mileage: mileageNum,
       options: options || undefined,
     })
-    return NextResponse.json({ tradeValue })
+
+    const result = await getTradeValue({
+      modelTrimId: modelTrimIdNum,
+      condition: conditionNum,
+      mileage: mileageNum,
+      options: options || undefined,
+    })
+
+    console.log('[trade-value] BishConnect response:', result)
+
+    return NextResponse.json(result)
   } catch (error: unknown) {
     console.error('Error fetching trade value:', error)
     return NextResponse.json(

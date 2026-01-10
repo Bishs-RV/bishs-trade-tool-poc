@@ -1,14 +1,13 @@
 import { TradeData, CalculatedValues } from './types';
 import {
-  RECON_FIXED_BASE,
   SOLD_PREP_FIXED,
-  RECON_PENALTY_PER_POINT,
   MAX_CONDITION_SCORE,
   MOCK_COMP_DATA,
   getPrepCostTier,
 } from './constants';
+import type { TradeValueResult } from './bishconnect/client';
 
-export type DriverId = 
+export type DriverId =
   | 'trade-in-percent-slider'
   | 'margin-percent-slider'
   | 'rv-type'
@@ -20,22 +19,25 @@ export type DriverId =
   | 'initial-load'
   | 'lookup-complete';
 
+export type TradeValues = TradeValueResult;
+
 /**
  * Core calculation engine for the Trade-In Tool
  * Implements the complex interdependent formulas with two-way slider logic
  *
- * @param realJdPowerTradeIn - Real trade-in value from BishConnect API
+ * @param tradeValues - Trade values from BishConnect API (both raw and adjusted)
  */
 export function calculateValuation(
   data: TradeData,
   driverId: DriverId,
   isLookupComplete: boolean,
-  realJdPowerTradeIn?: number
+  tradeValues?: TradeValues
 ): CalculatedValues {
   // Initialize calculated values
   const calculated: CalculatedValues = {
     jdPowerTradeIn: 0,
     jdPowerRetailValue: 0,
+    bishAdjustedTradeIn: 0,
     pdiCost: 0,
     reconCost: 0,
     soldPrepCost: SOLD_PREP_FIXED,
@@ -73,14 +75,15 @@ export function calculateValuation(
     calculated.replacementCost = 40500;
   }
 
-  // JD Power Trade-In Value - only use real value from API
-  calculated.jdPowerTradeIn = realJdPowerTradeIn ?? 0;
+  // Trade values from API
+  calculated.jdPowerTradeIn = tradeValues?.jdPowerTradeIn ?? 0;
+  calculated.bishAdjustedTradeIn = tradeValues?.bishAdjustedTradeIn ?? 0;
+  calculated.jdPowerRetailValue = tradeValues?.usedRetail ?? 0;
 
-  // JD Power Retail Value (13% above Trade-In)
-  calculated.jdPowerRetailValue = calculated.jdPowerTradeIn * 1.13;
+  console.log('[calculateValuation] tradeValues:', tradeValues);
 
-  // Get the appropriate prep cost tier based on JD Power Trade-In value
-  const prepTier = getPrepCostTier(calculated.jdPowerTradeIn);
+  // Get the appropriate prep cost tier based on Bish adjusted trade-in value
+  const prepTier = getPrepCostTier(calculated.bishAdjustedTradeIn);
 
   // PDI Cost from tier
   calculated.pdiCost = prepTier.pdiLabor;
@@ -105,8 +108,8 @@ export function calculateValuation(
     calculated.soldPrepCost + 
     data.additionalPrepCost;
 
-  // Bish's TIV Base = JD Power Trade-In * 0.9 (10% less than JD Power Trade-In)
-  calculated.bishTIVBase = calculated.jdPowerTradeIn * 0.9;
+  // Bish's TIV Base = Bish Adjusted Trade-In (depreciation already applied by API)
+  calculated.bishTIVBase = calculated.bishAdjustedTradeIn;
 
   // Total Unit Costs = Bish's TIV Base + Total Prep Costs
   calculated.totalUnitCosts = calculated.bishTIVBase + calculated.totalPrepCosts;
@@ -119,7 +122,6 @@ export function calculateValuation(
 
   // TWO-WAY SLIDER LOGIC
   let finalTradeOffer = 0;
-  let finalMarginPercent = 0;
 
   const driversForTradeInPercentRecalc: DriverId[] = [
     'trade-in-percent-slider',
@@ -137,21 +139,13 @@ export function calculateValuation(
     // Final Trade Offer = Trade-In % * Total Unit Costs
     finalTradeOffer = calculated.totalUnitCosts * data.tradeInPercent;
 
-    // Calculate resulting margin: Retail Price - Final Trade Offer
-    const marginAmount = calculated.activeRetailPrice - finalTradeOffer;
-    finalMarginPercent = calculated.activeRetailPrice > 0 
-      ? marginAmount / calculated.activeRetailPrice 
-      : 0;
-
   } else if (driverId === 'margin-percent-slider' || driverId === 'initial-load') {
     // Scenario 2: User adjusts Target Margin % (Relative to Active Retail Price) OR Initial Load
     const targetMarginAmount = calculated.activeRetailPrice * data.targetMarginPercent;
-    
+
     // Final Trade Offer = Active Retail Price - Target Margin Amount
     finalTradeOffer = calculated.activeRetailPrice - targetMarginAmount;
     finalTradeOffer = Math.max(0, finalTradeOffer);
-
-    finalMarginPercent = data.targetMarginPercent;
   }
 
   // Final metrics
