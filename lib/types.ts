@@ -90,7 +90,4 @@ export interface CalculatedValues {
   finalTradeOffer: number;
   calculatedMarginAmount: number;
   calculatedMarginPercent: number;
-
-  // Active prep cost tier
-  activePrepTier: PrepCostTier | null;
 }

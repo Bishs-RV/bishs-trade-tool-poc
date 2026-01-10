@@ -8,7 +8,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 
 interface Section2Props {
@@ -16,15 +15,6 @@ interface Section2Props {
   calculated: CalculatedValues;
   onUpdate: (updates: Partial<TradeData>) => void;
   isLocked: boolean;
-}
-
-function TierCostItem({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="flex justify-between bg-white/50 rounded px-2 py-1 text-xs">
-      <span className="text-muted-foreground">{label}:</span>
-      <span className="font-semibold">{formatCurrency(value)}</span>
-    </div>
-  );
 }
 
 function CostColumn({ label, value }: { label: string; value: number }) {
@@ -56,9 +46,6 @@ export default function Section2Condition({
   onUpdate,
   isLocked,
 }: Section2Props) {
-  const conditionPenalty = (9 - data.conditionScore) * 500;
-  const pointsBelow = 9 - data.conditionScore;
-
   return (
     <div className="relative">
       <Card className={`h-full ${isLocked ? 'pointer-events-none select-none' : ''}`}>
@@ -110,52 +97,8 @@ export default function Section2Condition({
                 <span className="text-green-600 font-medium">9 (Excellent)</span>
               </div>
 
-              {pointsBelow > 0 ? (
-                <Alert variant="default" className="bg-amber-50 border-amber-200">
-                  <AlertDescription className="text-xs text-amber-800">
-                    <strong>Recon Penalty:</strong> +{formatCurrency(conditionPenalty)} added to base recon
-                    <span className="text-amber-600 ml-1">
-                      ({pointsBelow} {pointsBelow === 1 ? 'point' : 'points'} below 9 × $500)
-                    </span>
-                  </AlertDescription>
-                </Alert>
-              ) : (
-                <Alert variant="default" className="bg-green-50 border-green-200">
-                  <AlertDescription className="text-xs text-green-800">
-                    <strong>No Recon Penalty</strong> — Excellent condition
-                  </AlertDescription>
-                </Alert>
-              )}
             </CardContent>
           </Card>
-
-          {/* Active Cost Tier */}
-          {calculated.activePrepTier && (
-            <Card className="bg-primary/5 border-primary/20">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center justify-between">
-                  <span>Active Cost Tier</span>
-                  <Badge variant="default" className="text-lg font-black">
-                    {calculated.activePrepTier.pdiType}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-xs text-muted-foreground">
-                  Based on JD Power Trade-In: <strong className="text-foreground">{formatCurrency(calculated.jdPowerTradeIn)}</strong>
-                  <span className="ml-1">(Range: {calculated.activePrepTier.invoiceRange})</span>
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  <TierCostItem label="PDI Labor" value={calculated.activePrepTier.pdiLabor} />
-                  <TierCostItem label="Base Recon" value={calculated.activePrepTier.recon} />
-                  <TierCostItem label="Get Ready" value={calculated.activePrepTier.getReady} />
-                  <TierCostItem label="Orientation" value={calculated.activePrepTier.orientation} />
-                  <TierCostItem label="Detail" value={calculated.activePrepTier.detail} />
-                  <TierCostItem label="Supplies" value={calculated.activePrepTier.shopSupplies} />
-                </div>
-              </CardContent>
-            </Card>
-          )}
 
           {/* Notes & Overrides */}
           <Card className="bg-muted/30">

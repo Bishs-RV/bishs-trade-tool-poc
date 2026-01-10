@@ -53,7 +53,6 @@ export default function Home() {
     finalTradeOffer: 0,
     calculatedMarginAmount: 0,
     calculatedMarginPercent: 0,
-    activePrepTier: null,
   });
 
   // Initial calculation on mount to set Trade-In % based on default margin
