@@ -1,8 +1,11 @@
 'use client';
 
+import { useState, useEffect, useRef } from 'react';
 import { TradeData, CalculatedValues } from '@/lib/types';
-import { LOCATIONS, RV_TYPE_OPTIONS, RV_MAKES, RV_MODELS, isMotorized } from '@/lib/constants';
+import { LOCATIONS, RV_TYPE_OPTIONS, isMotorized } from '@/lib/constants';
 import { formatCurrency } from '@/lib/calculations';
+import { getCategoryId } from '@/lib/jdpower/rv-types';
+import type { MakeCategory, ModelTrim } from '@/lib/jdpower/types';
 
 interface Section1Props {
   data: TradeData;
@@ -22,13 +25,143 @@ export default function Section1UnitData({
   isLoading = false,
 }: Section1Props) {
   const isMileageEnabled = isMotorized(data.rvType);
-  
+
+  // JD Power cascading data
+  const [manufacturers, setManufacturers] = useState<MakeCategory[]>([]);
+  const [modelTrims, setModelTrims] = useState<ModelTrim[]>([]);
+  const [isLoadingMakes, setIsLoadingMakes] = useState(false);
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
+
+  // Use ref to avoid onUpdate in dependency arrays (prevents infinite loops)
+  const onUpdateRef = useRef(onUpdate);
+  useEffect(() => { onUpdateRef.current = onUpdate; });
+
+  // Derived data for dropdowns
+  const uniqueMakes = Array.from(new Set(modelTrims.map(m => m.ModelSeries))).filter(Boolean).sort();
+  const filteredModels = modelTrims.filter(m => m.ModelSeries === data.make);
+
+  // Fetch manufacturers when year + RV type change
+  useEffect(() => {
+    if (!data.year || !data.rvType) {
+      setManufacturers([]);
+      return;
+    }
+
+    const abortController = new AbortController();
+
+    const fetchMakes = async () => {
+      setIsLoadingMakes(true);
+      try {
+        const categoryId = getCategoryId(data.rvType);
+        const response = await fetch(
+          `/api/jdpower/makes?year=${data.year}&rvCategoryId=${categoryId}`,
+          { signal: abortController.signal }
+        );
+        if (!response.ok) throw new Error('Failed to fetch manufacturers');
+        const result = await response.json();
+        if (!abortController.signal.aborted) {
+          setManufacturers(result.makes || []);
+        }
+      } catch (error) {
+        if (!abortController.signal.aborted) {
+          console.error('Error fetching manufacturers:', error);
+          setManufacturers([]);
+        }
+      } finally {
+        if (!abortController.signal.aborted) {
+          setIsLoadingMakes(false);
+        }
+      }
+    };
+
+    fetchMakes();
+    // Reset downstream selections
+    onUpdateRef.current({
+      jdPowerManufacturerId: null,
+      make: '',
+      model: '',
+      jdPowerModelTrimId: null,
+    });
+
+    return () => abortController.abort();
+  }, [data.year, data.rvType]);
+
+  // Fetch model trims when manufacturer changes
+  useEffect(() => {
+    if (!data.year || !data.rvType || !data.jdPowerManufacturerId) {
+      setModelTrims([]);
+      return;
+    }
+
+    const abortController = new AbortController();
+
+    const fetchModels = async () => {
+      setIsLoadingModels(true);
+      try {
+        const categoryId = getCategoryId(data.rvType);
+        const response = await fetch(
+          `/api/jdpower/model-trims?makeId=${data.jdPowerManufacturerId}&year=${data.year}&rvCategoryId=${categoryId}`,
+          { signal: abortController.signal }
+        );
+        if (!response.ok) throw new Error('Failed to fetch models');
+        const result = await response.json();
+        if (!abortController.signal.aborted) {
+          setModelTrims(result.modelTrims || []);
+        }
+      } catch (error) {
+        if (!abortController.signal.aborted) {
+          console.error('Error fetching models:', error);
+          setModelTrims([]);
+        }
+      } finally {
+        if (!abortController.signal.aborted) {
+          setIsLoadingModels(false);
+        }
+      }
+    };
+
+    fetchModels();
+    // Reset make/model selections when manufacturer changes
+    onUpdateRef.current({
+      make: '',
+      model: '',
+      jdPowerModelTrimId: null,
+    });
+
+    return () => abortController.abort();
+  }, [data.jdPowerManufacturerId, data.year, data.rvType]);
+
   const isLookupReady =
     data.year !== null &&
+    data.jdPowerManufacturerId !== null &&
     data.make.trim() !== '' &&
     data.model.trim() !== '' &&
     data.rvType !== null &&
     data.jdPowerModelTrimId !== null;
+
+  const handleManufacturerChange = (manufacturerId: string) => {
+    const parsed = parseInt(manufacturerId, 10);
+    const id = manufacturerId && !isNaN(parsed) ? parsed : null;
+    onUpdate({ jdPowerManufacturerId: id });
+  };
+
+  const handleMakeChange = (make: string) => {
+    onUpdate({
+      make,
+      model: '',
+      jdPowerModelTrimId: null,
+    });
+  };
+
+  const handleModelChange = (modelTrimId: string) => {
+    const selectedModel = modelTrims.find(m => m.ModelTrimID.toString() === modelTrimId);
+    if (selectedModel) {
+      onUpdate({
+        model: selectedModel.ModelTrimName,
+        jdPowerModelTrimId: selectedModel.ModelTrimID,
+      });
+    }
+  };
 
   return (
     <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 h-full">
@@ -36,32 +169,13 @@ export default function Section1UnitData({
         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-500 to-slate-700 flex items-center justify-center text-white font-bold text-sm shadow-lg">
           1
         </div>
-        <h2 className="text-lg font-bold text-gray-900">
-          Unit & Base Data
-        </h2>
+        <h2 className="text-lg font-bold text-gray-900">Unit & Base Data</h2>
       </div>
       <div className="space-y-2">
         {/* Customer Info Section */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-xs font-bold text-blue-900 uppercase tracking-wide">Customer Info</h3>
-            <button
-              type="button"
-              onClick={() => {
-                // Mock lookup - in production this would search for prior valuations
-                if (data.customerPhone || data.customerEmail) {
-                  alert('Customer lookup feature coming soon! This will search for prior valuations by phone/email.');
-                }
-              }}
-              disabled={!data.customerPhone && !data.customerEmail}
-              className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
-                data.customerPhone || data.customerEmail
-                  ? 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }`}
-            >
-              Load Prior Valuation
-            </button>
           </div>
           <div className="grid grid-cols-3 gap-2">
             <div>
@@ -103,7 +217,7 @@ export default function Section1UnitData({
           </div>
         </div>
 
-        {/* Stock Number and VIN on same line */}
+        {/* Stock Number and VIN */}
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label htmlFor="stock-number" className="block text-xs font-semibold text-gray-700 mb-0.5">
@@ -118,7 +232,6 @@ export default function Section1UnitData({
               onChange={(e) => onUpdate({ stockNumber: e.target.value })}
             />
           </div>
-
           <div>
             <label htmlFor="vin" className="block text-xs font-semibold text-gray-700 mb-0.5">
               VIN
@@ -129,14 +242,13 @@ export default function Section1UnitData({
               maxLength={17}
               className="mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300 font-mono"
               placeholder="17-Digit VIN"
-              required
               value={data.vin}
               onChange={(e) => onUpdate({ vin: e.target.value.toUpperCase() })}
             />
           </div>
         </div>
 
-        {/* Location Dropdown */}
+        {/* Location */}
         <div>
           <label htmlFor="location" className="block text-xs font-semibold text-gray-700 mb-0.5">
             Location <span className="text-red-600">*</span>
@@ -155,7 +267,7 @@ export default function Section1UnitData({
           </select>
         </div>
 
-        {/* Year, RV Type */}
+        {/* Year and RV Type - triggers manufacturer fetch */}
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label htmlFor="year" className="block text-xs font-semibold text-gray-700 mb-0.5">
@@ -180,7 +292,7 @@ export default function Section1UnitData({
               className="mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300"
               required
               value={data.rvType}
-              onChange={(e) => onUpdate({ rvType: e.target.value as any, mileage: null })}
+              onChange={(e) => onUpdate({ rvType: e.target.value as TradeData['rvType'], mileage: null })}
             >
               {RV_TYPE_OPTIONS.map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -189,43 +301,73 @@ export default function Section1UnitData({
           </div>
         </div>
 
+        {/* Manufacturer - from JD Power */}
+        <div>
+          <label htmlFor="manufacturer" className="block text-xs font-semibold text-gray-700 mb-0.5">
+            Manufacturer <span className="text-red-600">*</span>
+            {isLoadingMakes && <span className="ml-2 text-blue-500 text-xs">(Loading...)</span>}
+          </label>
+          <select
+            id="manufacturer"
+            className="mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300 disabled:bg-gray-100 disabled:cursor-not-allowed"
+            required
+            disabled={!data.year || manufacturers.length === 0 || isLoadingMakes}
+            value={data.jdPowerManufacturerId?.toString() || ''}
+            onChange={(e) => handleManufacturerChange(e.target.value)}
+          >
+            <option value="">Select Manufacturer</option>
+            {manufacturers.map(m => (
+              <option key={m.makeReturnTO.MakeID} value={m.makeReturnTO.MakeID}>
+                {m.makeReturnTO.MakeDisplayName}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Make (ModelSeries from JD Power) */}
         <div>
           <label htmlFor="make" className="block text-xs font-semibold text-gray-700 mb-0.5">
             Make <span className="text-red-600">*</span>
+            {isLoadingModels && <span className="ml-2 text-blue-500 text-xs">(Loading...)</span>}
           </label>
           <select
             id="make"
-            className="mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300"
+            className="mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300 disabled:bg-gray-100 disabled:cursor-not-allowed"
             required
+            disabled={!data.jdPowerManufacturerId || uniqueMakes.length === 0 || isLoadingModels}
             value={data.make}
-            onChange={(e) => onUpdate({ make: e.target.value })}
+            onChange={(e) => handleMakeChange(e.target.value)}
           >
             <option value="">Select Make</option>
-            {RV_MAKES.map(make => (
+            {uniqueMakes.map(make => (
               <option key={make} value={make}>{make}</option>
             ))}
           </select>
         </div>
 
+        {/* Model (ModelTrimName from JD Power) */}
         <div>
           <label htmlFor="model" className="block text-xs font-semibold text-gray-700 mb-0.5">
             Model/Floorplan <span className="text-red-600">*</span>
           </label>
           <select
             id="model"
-            className="mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300"
+            className="mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300 disabled:bg-gray-100 disabled:cursor-not-allowed"
             required
-            value={data.model}
-            onChange={(e) => onUpdate({ model: e.target.value })}
+            disabled={!data.make || filteredModels.length === 0}
+            value={data.jdPowerModelTrimId?.toString() || ''}
+            onChange={(e) => handleModelChange(e.target.value)}
           >
             <option value="">Select Model</option>
-            {RV_MODELS.map(model => (
-              <option key={model} value={model}>{model}</option>
+            {filteredModels.map(model => (
+              <option key={model.ModelTrimID} value={model.ModelTrimID}>
+                {model.ModelTrimName}
+              </option>
             ))}
           </select>
         </div>
 
-        {/* Mileage field - enabled/disabled by RV type */}
+        {/* Mileage */}
         <div>
           <label htmlFor="mileage" className="block text-xs font-semibold text-gray-700 mb-0.5">
             Mileage / Engine Hours
@@ -234,7 +376,7 @@ export default function Section1UnitData({
             type="number"
             id="mileage"
             className={`mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm transition-all ${
-              isMileageEnabled 
+              isMileageEnabled
                 ? 'bg-white text-gray-900 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 hover:border-blue-300'
                 : 'bg-gray-100 text-gray-500 cursor-not-allowed'
             }`}
@@ -242,20 +384,6 @@ export default function Section1UnitData({
             disabled={!isMileageEnabled}
             value={data.mileage || ''}
             onChange={(e) => onUpdate({ mileage: e.target.value ? parseInt(e.target.value) : null })}
-          />
-        </div>
-
-        <div>
-          <label htmlFor="original-list-price" className="block text-xs font-semibold text-gray-700 mb-0.5">
-            Original List Price
-          </label>
-          <input
-            type="number"
-            id="original-list-price"
-            className="mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300"
-            placeholder="e.g., 85000"
-            value={data.originalListPrice || ''}
-            onChange={(e) => onUpdate({ originalListPrice: e.target.value ? parseInt(e.target.value) : null })}
           />
         </div>
 
@@ -288,7 +416,7 @@ export default function Section1UnitData({
             </span>
           ) : isLookupComplete ? (
             <span className="flex items-center justify-center gap-2">
-              <span className="text-xl">✓</span> Unit Data Loaded
+              <span className="text-xl">✓</span> Trade Value Loaded
             </span>
           ) : (
             'Get Trade Value'
