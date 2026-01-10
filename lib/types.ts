@@ -40,6 +40,21 @@ export interface TradeData {
 
 export type RVType = 'TT' | 'FW' | 'POP' | 'TC' | 'CAG' | 'CAD' | 'CCG' | 'CCD';
 
+// Prep cost tiers based on JD Power Trade-In value
+export interface PrepCostTier {
+  ceiling: number;
+  pdiType: string;
+  invoiceRange: string;
+  pdiLabor: number;
+  pdiTime: number;
+  getReady: number;
+  orientation: number;
+  recon: number;
+  detail: number;
+  giftCertificate: number;
+  shopSupplies: number;
+}
+
 export interface ComparableUnit {
   price: number; // Original asking price or comparable price
   dealership: string;

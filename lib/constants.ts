@@ -1,4 +1,4 @@
-import { RVType, ComparableUnit } from './types';
+import { RVType, ComparableUnit, PrepCostTier } from './types';
 
 // PDI Cost mapping by RV Type - DEPRECATED, now using pricing tiers
 export const RV_PDI_MAP: Record<RVType, number> = {
@@ -11,21 +11,6 @@ export const RV_PDI_MAP: Record<RVType, number> = {
   'CAG': 2500,
   'CAD': 2500,
 };
-
-// Prep cost tiers based on JD Power Trade-In value
-export interface PrepCostTier {
-  ceiling: number;
-  pdiType: string;
-  invoiceRange: string;
-  pdiLabor: number;
-  pdiTime: number;
-  getReady: number;
-  orientation: number;
-  recon: number;
-  detail: number;
-  giftCertificate: number;
-  shopSupplies: number;
-}
 
 export const PREP_COST_TIERS: PrepCostTier[] = [
   { ceiling: 5000, pdiType: 'UPDI 1', invoiceRange: '0-5k', pdiLabor: 112.50, pdiTime: 1.5, getReady: 37.50, orientation: 75.00, recon: 112.50, detail: 100.00, giftCertificate: 25.00, shopSupplies: 50.00 },
