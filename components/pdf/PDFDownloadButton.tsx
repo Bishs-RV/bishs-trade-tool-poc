@@ -48,8 +48,8 @@ export function PDFDownloadButton({
         disabled
         className="px-4 py-2 text-xs text-gray-400 font-bold rounded-lg shadow-md bg-gray-200 border border-gray-300 flex items-center gap-2 cursor-not-allowed"
       >
-        <span>&#128438;</span>
-        <span>Download PDF</span>
+        <span>🖨</span>
+        <span>PDF PRINTOUT</span>
       </button>
     );
   }
@@ -73,8 +73,8 @@ export function PDFDownloadButton({
             type="button"
             className="px-4 py-2 text-xs text-white font-bold rounded-lg shadow-md transition-all bg-slate-700 hover:bg-slate-800 transform hover:scale-105 active:scale-95 border border-slate-600 flex items-center gap-2"
           >
-            <span>&#128438;</span>
-            <span>Download PDF</span>
+            <span>🖨</span>
+            <span>PDF PRINTOUT</span>
           </button>
         )
       }
