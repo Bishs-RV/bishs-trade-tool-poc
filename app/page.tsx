@@ -12,6 +12,7 @@ export default function Home() {
   const [isLookupComplete, setIsLookupComplete] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [realTradeValue, setRealTradeValue] = useState<number | undefined>(undefined);
   const [data, setData] = useState<TradeData>({
     customerName: '',
     customerPhone: '',
@@ -66,25 +67,27 @@ export default function Home() {
   }, []);
 
   // Recalculate whenever data changes
-  const recalculate = (driverId: DriverId, updates?: Partial<TradeData>) => {
+  const recalculate = (driverId: DriverId, updates?: Partial<TradeData>, tradeValue?: number) => {
     const newData = updates ? { ...data, ...updates } : data;
-    
+    // Use provided tradeValue, or fall back to stored realTradeValue
+    const jdPowerTradeIn = tradeValue ?? realTradeValue;
+
     // Handle slider inverse calculation
     if (driverId === 'margin-percent-slider' || driverId === 'initial-load') {
-      const newCalc = calculateValuation(newData, driverId, isLookupComplete);
+      const newCalc = calculateValuation(newData, driverId, isLookupComplete, jdPowerTradeIn);
       const newTradeInPercent = calculateTradeInPercentFromMargin(
         newCalc.totalUnitCosts,
         newCalc.finalTradeOffer
       );
-      
+
       setData({ ...newData, tradeInPercent: newTradeInPercent });
       setCalculated(newCalc);
     } else {
-      const newCalc = calculateValuation(newData, driverId, isLookupComplete);
-      
+      const newCalc = calculateValuation(newData, driverId, isLookupComplete, jdPowerTradeIn);
+
       // Update target margin percent based on calculated margin
-      if (driverId === 'trade-in-percent-slider' || 
-          driverId === 'condition-score' || 
+      if (driverId === 'trade-in-percent-slider' ||
+          driverId === 'condition-score' ||
           driverId === 'additional-prep-cost' ||
           driverId === 'avg-listing-price' ||
           driverId === 'custom-retail-price' ||
@@ -94,12 +97,26 @@ export default function Home() {
       } else {
         setData(newData);
       }
-      
+
       setCalculated(newCalc);
     }
   };
 
   const handleUpdate = (updates: Partial<TradeData>, driverId: DriverId = 'trade-in-percent-slider') => {
+    // Reset lookup state when vehicle selection fields change
+    const vehicleFieldsChanged =
+      'year' in updates ||
+      'rvType' in updates ||
+      'jdPowerManufacturerId' in updates ||
+      'jdPowerModelTrimId' in updates ||
+      'make' in updates ||
+      'model' in updates;
+
+    if (vehicleFieldsChanged && isLookupComplete) {
+      setIsLookupComplete(false);
+      setRealTradeValue(undefined);
+    }
+
     recalculate(driverId, updates);
   };
 
@@ -126,24 +143,20 @@ export default function Home() {
       }
 
       const result = await response.json();
-      if (typeof result.tradeValue !== 'number') {
-        throw new Error('Invalid API response');
+      if (typeof result.tradeValue !== 'number' || !isFinite(result.tradeValue) || result.tradeValue <= 0) {
+        throw new Error('Invalid trade value from API');
       }
       const tradeValue = result.tradeValue;
+
+      // Store the real trade value for future recalculations
+      setRealTradeValue(tradeValue);
 
       // Update with real trade value and trigger recalculation
       const updates: Partial<TradeData> = {
         avgListingPrice: tradeValue * 1.15,
       };
 
-      // Update calculated values with real JD Power trade-in
-      setCalculated(prev => ({
-        ...prev,
-        jdPowerTradeIn: tradeValue,
-        jdPowerRetailValue: tradeValue * 1.13,
-      }));
-
-      recalculate('lookup-complete', updates);
+      recalculate('lookup-complete', updates, tradeValue);
       setIsLookupComplete(true);
     } catch (error: unknown) {
       console.error('Lookup error:', error);

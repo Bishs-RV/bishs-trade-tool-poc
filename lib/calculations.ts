@@ -23,11 +23,14 @@ export type DriverId =
 /**
  * Core calculation engine for the Trade-In Tool
  * Implements the complex interdependent formulas with two-way slider logic
+ *
+ * @param realJdPowerTradeIn - Real trade-in value from BishConnect API
  */
 export function calculateValuation(
   data: TradeData,
   driverId: DriverId,
-  isLookupComplete: boolean
+  isLookupComplete: boolean,
+  realJdPowerTradeIn?: number
 ): CalculatedValues {
   // Initialize calculated values
   const calculated: CalculatedValues = {
@@ -57,9 +60,9 @@ export function calculateValuation(
   // Calculate Bish's Likely Retail Price (weighted average)
   const compWeight = MOCK_COMP_DATA.length > 0 ? 0.6 : 0;
   const alpWeight = 0.4;
-  calculated.calculatedRetailPrice = 
+  calculated.calculatedRetailPrice =
     (calculated.avgCompPrice * compWeight) + (data.avgListingPrice * alpWeight);
-  
+
   // Default to 40000 if too low
   if (calculated.calculatedRetailPrice < 1000) {
     calculated.calculatedRetailPrice = 40000;
@@ -70,8 +73,8 @@ export function calculateValuation(
     calculated.replacementCost = 40500;
   }
 
-  // JD Power Trade-In Value (mock: 82% of retail price)
-  calculated.jdPowerTradeIn = calculated.calculatedRetailPrice * 0.82;
+  // JD Power Trade-In Value - only use real value from API
+  calculated.jdPowerTradeIn = realJdPowerTradeIn ?? 0;
 
   // JD Power Retail Value (13% above Trade-In)
   calculated.jdPowerRetailValue = calculated.jdPowerTradeIn * 1.13;
