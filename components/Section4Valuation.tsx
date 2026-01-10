@@ -3,6 +3,7 @@
 import { TradeData, CalculatedValues } from '@/lib/types';
 import { formatCurrency, formatPercent } from '@/lib/calculations';
 import { TARGET_MARGIN_PERCENT } from '@/lib/constants';
+import { PDFDownloadButton } from '@/components/pdf/PDFDownloadButton';
 
 interface Section4Props {
   data: TradeData;
@@ -17,10 +18,6 @@ export default function Section4Valuation({
   onUpdate,
   isLocked,
 }: Section4Props) {
-  const handlePrint = () => {
-    window.print();
-  };
-
   return (
     <div className="relative">
       <div className={`bg-white p-4 rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 ${isLocked ? 'pointer-events-none select-none' : ''}`}>
@@ -239,16 +236,13 @@ export default function Section4Valuation({
           </div>
         </div>
 
-        {/* Print Button */}
+        {/* PDF Download Button */}
         <div className="pt-3 flex justify-end">
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="px-4 py-2 text-xs text-white font-bold rounded-lg shadow-md transition-all bg-slate-700 hover:bg-slate-800 transform hover:scale-105 active:scale-95 border border-slate-600 flex items-center gap-2"
-          >
-            <span>🖨</span>
-            <span>PDF PRINTOUT</span>
-          </button>
+          <PDFDownloadButton
+            data={data}
+            calculated={calculated}
+            disabled={isLocked}
+          />
         </div>
       </div>
     </div>
