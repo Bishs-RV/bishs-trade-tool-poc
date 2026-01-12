@@ -158,6 +158,7 @@ export default function Home() {
         jdPowerTradeIn: result.jdPowerTradeIn,
         bishAdjustedTradeIn: result.bishAdjustedTradeIn,
         usedRetail: result.usedRetail,
+        valuationResults: result.valuationResults,
       };
       console.log('[handleLookup] Trade values received:', newTradeValues);
 

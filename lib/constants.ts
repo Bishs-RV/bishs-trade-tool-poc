@@ -42,8 +42,17 @@ export const PREP_COST_TIERS: PrepCostTier[] = [
 ];
 
 // Helper function to get prep cost tier based on JD Power Trade-In value
+// Uses "greater than" logic: find the highest tier ceiling the value exceeds
+// Example: $20,700 > $20,000 ceiling → use the $20,000 tier ($187.50 recon)
 export function getPrepCostTier(jdPowerTradeIn: number): PrepCostTier {
-  return PREP_COST_TIERS.find(tier => jdPowerTradeIn <= tier.ceiling) || PREP_COST_TIERS[PREP_COST_TIERS.length - 1];
+  // Work backwards to find the highest ceiling the value exceeds
+  for (let i = PREP_COST_TIERS.length - 1; i >= 0; i--) {
+    if (jdPowerTradeIn > PREP_COST_TIERS[i].ceiling) {
+      return PREP_COST_TIERS[i];
+    }
+  }
+  // Value doesn't exceed any ceiling, return first tier
+  return PREP_COST_TIERS[0];
 }
 
 // Fixed cost constants
