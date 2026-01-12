@@ -2,7 +2,7 @@
 
 import { getBishConnectToken } from './auth'
 
-interface ValuationResult {
+export interface ValuationResult {
   original_trade_value: number
   adjusted_value: number
   min_value: number
@@ -26,6 +26,7 @@ export interface TradeValueResult {
   jdPowerTradeIn: number      // Raw JD Power value (base_trade_in)
   bishAdjustedTradeIn: number // Our adjusted value after depreciation
   usedRetail: number          // JD Power retail value
+  valuationResults?: Record<string, ValuationResult> // All condition-based valuations
 }
 
 interface GetTradeValueParams {
@@ -91,6 +92,7 @@ export async function getTradeValue({
     jdPowerTradeIn: data.values.base_trade_in,
     bishAdjustedTradeIn: conditionResult?.adjusted_value ?? data.values.trade_in,
     usedRetail: data.values.used_retail,
+    valuationResults: data.valuation_results,
   }
 
   console.log('[BishConnect] Returning values:', result)

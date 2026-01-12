@@ -1,7 +1,6 @@
 import { TradeData, CalculatedValues } from './types';
 import {
   SOLD_PREP_FIXED,
-  MAX_CONDITION_SCORE,
   MOCK_COMP_DATA,
   getPrepCostTier,
 } from './constants';
@@ -80,18 +79,15 @@ export function calculateValuation(
   calculated.bishAdjustedTradeIn = tradeValues?.bishAdjustedTradeIn ?? 0;
   calculated.jdPowerRetailValue = tradeValues?.usedRetail ?? 0;
 
-  console.log('[calculateValuation] tradeValues:', tradeValues);
-
-  // Get the appropriate prep cost tier based on Bish adjusted trade-in value
+  // Get prep cost tier based on Bish adjusted trade-in value (for PDI, sold prep, etc.)
   const prepTier = getPrepCostTier(calculated.bishAdjustedTradeIn);
 
   // PDI Cost from tier
   calculated.pdiCost = prepTier.pdiLabor;
 
-  // Recon Cost: Base recon from tier + $500 per condition point below 9
-  // Condition score 9 = base only, score 8 = base + $500, score 7 = base + $1000, etc.
-  const conditionPenalty = (MAX_CONDITION_SCORE - data.conditionScore) * 500;
-  calculated.reconCost = prepTier.recon + conditionPenalty;
+  // Recon Cost: Lookup based on JD Power Trade-In value (raw, not adjusted)
+  const reconTier = getPrepCostTier(calculated.jdPowerTradeIn);
+  calculated.reconCost = reconTier.recon;
 
   // Sold Prep Cost: Sum of Get Ready + Orientation + Detail + Gift Certificate + Shop Supplies
   calculated.soldPrepCost = 
@@ -108,8 +104,10 @@ export function calculateValuation(
     calculated.soldPrepCost + 
     data.additionalPrepCost;
 
-  // Bish's TIV Base = Bish Adjusted Trade-In (depreciation already applied by API)
-  calculated.bishTIVBase = calculated.bishAdjustedTradeIn;
+  // Bish's TIV Base = condition-specific adjusted_value from API
+  const conditionKey = data.conditionScore.toString();
+  const conditionResult = tradeValues?.valuationResults?.[conditionKey];
+  calculated.bishTIVBase = conditionResult?.adjusted_value ?? calculated.bishAdjustedTradeIn;
 
   // Total Unit Costs = Bish's TIV Base + Total Prep Costs
   calculated.totalUnitCosts = calculated.bishTIVBase + calculated.totalPrepCosts;
