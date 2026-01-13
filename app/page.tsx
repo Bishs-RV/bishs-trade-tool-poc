@@ -263,11 +263,11 @@ export default function Home() {
       }
 
       const result = await response.json();
-      if (!result.evaluation?.id) {
+      if (!result.evaluation?.tradeEvaluationId) {
         throw new Error('Invalid response from server');
       }
       console.log('Valuation saved:', result.evaluation);
-      alert(`Valuation saved successfully! ID: ${result.evaluation.id}`);
+      alert(`Valuation saved successfully! ID: ${result.evaluation.tradeEvaluationId}`);
     } catch (error: unknown) {
       console.error('Submit error:', error);
       const message = error instanceof Error ? error.message : 'Failed to save valuation';
