@@ -182,3 +182,13 @@ export const RV_MODELS = [
 export const isMotorized = (rvType: RVType): boolean => {
   return rvType.startsWith('CA') || rvType.startsWith('CC');
 };
+
+// Generate year options for trade-in form (next year down to 15 years ago)
+export function getTradeInYears(): number[] {
+  const currentYear = new Date().getFullYear();
+  const years: number[] = [];
+  for (let y = currentYear + 1; y >= currentYear - 15; y--) {
+    years.push(y);
+  }
+  return years;
+}

@@ -4,6 +4,7 @@ import type {
   GetMakesResponse,
   GetModelTrimsResponse,
   GetOptionsResponse,
+  GetYearsResponse,
   MakeCategory,
   ModelTrim,
   ModelTrimOption,
@@ -78,4 +79,15 @@ export async function fetchModelTrimOptions(
   const url = `${JDPOWER_BASE_URL}/Options/${modelTrimId}`
   const data = await fetchJDPowerData<GetOptionsResponse>(url)
   return data.GetOptionsResult.Options
+}
+
+/**
+ * Fetch available years for a given manufacturer
+ * @param makeId - The manufacturer ID from Makes endpoint
+ * @returns Array of year numbers sorted descending (newest first)
+ */
+export async function fetchYears(makeId: number): Promise<number[]> {
+  const url = `${JDPOWER_BASE_URL}/Years/${makeId}`
+  const data = await fetchJDPowerData<GetYearsResponse>(url)
+  return data.GetYearsResult.Years.map(y => y.Year).sort((a, b) => b - a)
 }

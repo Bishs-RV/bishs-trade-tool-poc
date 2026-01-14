@@ -6,19 +6,29 @@ export async function GET(request: NextRequest) {
   const year = searchParams.get('year')
   const rvCategoryId = searchParams.get('rvCategoryId')
 
-  if (!year || !rvCategoryId) {
+  if (!rvCategoryId) {
     return NextResponse.json(
-      { error: 'year and rvCategoryId are required' },
+      { error: 'rvCategoryId is required' },
       { status: 400 }
     )
   }
 
-  const yearNum = parseInt(year, 10)
   const categoryNum = parseInt(rvCategoryId, 10)
 
-  if (isNaN(yearNum) || isNaN(categoryNum)) {
+  if (isNaN(categoryNum)) {
     return NextResponse.json(
-      { error: 'year and rvCategoryId must be valid numbers' },
+      { error: 'rvCategoryId must be a valid number' },
+      { status: 400 }
+    )
+  }
+
+  // If year not provided, use current year (manufacturers available now)
+  const currentYear = new Date().getFullYear()
+  const yearNum = year ? parseInt(year, 10) : currentYear
+
+  if (isNaN(yearNum)) {
+    return NextResponse.json(
+      { error: 'year must be a valid number' },
       { status: 400 }
     )
   }

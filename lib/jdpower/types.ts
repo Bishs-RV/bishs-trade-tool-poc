@@ -63,6 +63,25 @@ export interface GetOptionsResponse {
   GetOptionsResult: GetOptionsResult
 }
 
+// Years endpoint response
+export interface YearInfo {
+  Year: number
+  YearType: string
+}
+
+export interface GetYearsResult {
+  Make: MakeReturnTO
+  VersionTO: {
+    VersionID: number
+    VersionName: string
+  }
+  Years: YearInfo[]
+}
+
+export interface GetYearsResponse {
+  GetYearsResult: GetYearsResult
+}
+
 // Simplified types for frontend use
 export interface Manufacturer {
   id: number
