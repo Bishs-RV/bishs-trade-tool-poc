@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { TradeData, CalculatedValues, RVType } from '@/lib/types';
-import { LOCATIONS, RV_TYPE_OPTIONS, isMotorized, getTradeInYears } from '@/lib/constants';
+import { LOCATIONS, RV_TYPE_OPTIONS, isMotorized } from '@/lib/constants';
 import { formatCurrency } from '@/lib/calculations';
 import { getCategoryId } from '@/lib/jdpower/rv-types';
 import type { MakeCategory, ModelTrim } from '@/lib/jdpower/types';
@@ -36,8 +36,10 @@ export default function Section1UnitData({
 
   // JD Power cascading data
   const [manufacturers, setManufacturers] = useState<MakeCategory[]>([]);
+  const [years, setYears] = useState<number[]>([]);
   const [modelTrims, setModelTrims] = useState<ModelTrim[]>([]);
   const [isLoadingMakes, setIsLoadingMakes] = useState(false);
+  const [isLoadingYears, setIsLoadingYears] = useState(false);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
 
   // Use ref to avoid onUpdate in dependency arrays (prevents infinite loops)
@@ -50,8 +52,8 @@ export default function Section1UnitData({
 
   // Memoized options for comboboxes
   const yearOptions = useMemo<ComboboxOption[]>(
-    () => getTradeInYears().map(y => ({ value: y.toString(), label: y.toString() })),
-    []
+    () => years.map(y => ({ value: y.toString(), label: y.toString() })),
+    [years]
   );
 
   const manufacturerOptions = useMemo<ComboboxOption[]>(
@@ -75,9 +77,9 @@ export default function Section1UnitData({
     [filteredModels]
   );
 
-  // Fetch manufacturers when year + RV type change
+  // Fetch manufacturers when RV type changes
   useEffect(() => {
-    if (!data.year || !data.rvType) {
+    if (!data.rvType) {
       setManufacturers([]);
       return;
     }
@@ -88,8 +90,9 @@ export default function Section1UnitData({
       setIsLoadingMakes(true);
       try {
         const categoryId = getCategoryId(data.rvType);
+        // Fetch manufacturers for current year (no year filter needed)
         const response = await fetch(
-          `/api/jdpower/makes?year=${data.year}&rvCategoryId=${categoryId}`,
+          `/api/jdpower/makes?rvCategoryId=${categoryId}`,
           { signal: abortController.signal }
         );
         if (!response.ok) throw new Error('Failed to fetch manufacturers');
@@ -110,18 +113,67 @@ export default function Section1UnitData({
     };
 
     fetchMakes();
-    // Reset downstream selections
+    // Reset downstream selections when RV type changes
+    setYears([]);
+    setModelTrims([]);
     onUpdateRef.current({
       jdPowerManufacturerId: null,
+      year: null,
       make: '',
       model: '',
       jdPowerModelTrimId: null,
     });
 
     return () => abortController.abort();
-  }, [data.year, data.rvType]);
+  }, [data.rvType]);
 
-  // Fetch model trims when manufacturer changes
+  // Fetch years when manufacturer changes
+  useEffect(() => {
+    if (!data.jdPowerManufacturerId) {
+      setYears([]);
+      return;
+    }
+
+    const abortController = new AbortController();
+
+    const fetchYearsData = async () => {
+      setIsLoadingYears(true);
+      try {
+        const response = await fetch(
+          `/api/jdpower/years?makeId=${data.jdPowerManufacturerId}`,
+          { signal: abortController.signal }
+        );
+        if (!response.ok) throw new Error('Failed to fetch years');
+        const result = await response.json();
+        if (!abortController.signal.aborted) {
+          setYears(result.years || []);
+        }
+      } catch (error) {
+        if (!abortController.signal.aborted) {
+          console.error('Error fetching years:', error);
+          setYears([]);
+        }
+      } finally {
+        if (!abortController.signal.aborted) {
+          setIsLoadingYears(false);
+        }
+      }
+    };
+
+    fetchYearsData();
+    // Reset downstream selections when manufacturer changes
+    setModelTrims([]);
+    onUpdateRef.current({
+      year: null,
+      make: '',
+      model: '',
+      jdPowerModelTrimId: null,
+    });
+
+    return () => abortController.abort();
+  }, [data.jdPowerManufacturerId]);
+
+  // Fetch model trims when year changes (manufacturer already selected)
   useEffect(() => {
     if (!data.year || !data.rvType || !data.jdPowerManufacturerId) {
       setModelTrims([]);
@@ -156,7 +208,8 @@ export default function Section1UnitData({
     };
 
     fetchModels();
-    // Reset make/model selections when manufacturer changes
+    // Reset make/model selections when year changes
+    setModelTrims([]);
     onUpdateRef.current({
       make: '',
       model: '',
@@ -164,7 +217,7 @@ export default function Section1UnitData({
     });
 
     return () => abortController.abort();
-  }, [data.jdPowerManufacturerId, data.year, data.rvType]);
+  }, [data.year, data.jdPowerManufacturerId, data.rvType]);
 
   const isLookupReady =
     data.year !== null &&
@@ -308,40 +361,24 @@ export default function Section1UnitData({
           </select>
         </div>
 
-        {/* Year and RV Type - triggers manufacturer fetch */}
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label htmlFor="year" className="block text-xs font-semibold text-gray-700 mb-0.5">
-              Year <span className="text-red-600">*</span>
-            </label>
-            <SearchableCombobox
-              id="year"
-              label="Year"
-              placeholder="Select Year"
-              searchPlaceholder="Search years..."
-              options={yearOptions}
-              value={data.year?.toString() ?? null}
-              onChange={handleYearChange}
-            />
-          </div>
-          <div>
-            <label htmlFor="rv-type" className="block text-xs font-semibold text-gray-700 mb-0.5">
-              RV Type <span className="text-red-600">*</span>
-            </label>
-            <Select value={data.rvType} onValueChange={handleRvTypeChange}>
-              <SelectTrigger id="rv-type" className="mt-0.5">
-                <SelectValue placeholder="Select RV Type" />
-              </SelectTrigger>
-              <SelectContent>
-                {RV_TYPE_OPTIONS.map(opt => (
-                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        {/* RV Type - triggers manufacturer fetch */}
+        <div>
+          <label htmlFor="rv-type" className="block text-xs font-semibold text-gray-700 mb-0.5">
+            RV Type <span className="text-red-600">*</span>
+          </label>
+          <Select value={data.rvType} onValueChange={handleRvTypeChange}>
+            <SelectTrigger id="rv-type" className="mt-0.5">
+              <SelectValue placeholder="Select RV Type" />
+            </SelectTrigger>
+            <SelectContent>
+              {RV_TYPE_OPTIONS.map(opt => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
-        {/* Manufacturer - from JD Power */}
+        {/* Manufacturer - from JD Power (depends on RV Type) */}
         <div>
           <label htmlFor="manufacturer" className="block text-xs font-semibold text-gray-700 mb-0.5">
             Manufacturer <span className="text-red-600">*</span>
@@ -355,11 +392,29 @@ export default function Section1UnitData({
             value={data.jdPowerManufacturerId?.toString() ?? null}
             onChange={handleManufacturerChange}
             isLoading={isLoadingMakes}
-            disabled={!data.year}
+            disabled={!data.rvType}
           />
         </div>
 
-        {/* Make (ModelSeries from JD Power) */}
+        {/* Year - from JD Power (depends on Manufacturer) */}
+        <div>
+          <label htmlFor="year" className="block text-xs font-semibold text-gray-700 mb-0.5">
+            Year <span className="text-red-600">*</span>
+          </label>
+          <SearchableCombobox
+            id="year"
+            label="Year"
+            placeholder="Select Year"
+            searchPlaceholder="Search years..."
+            options={yearOptions}
+            value={data.year?.toString() ?? null}
+            onChange={handleYearChange}
+            isLoading={isLoadingYears}
+            disabled={!data.jdPowerManufacturerId}
+          />
+        </div>
+
+        {/* Make (ModelSeries from JD Power - depends on Year) */}
         <div>
           <label htmlFor="make" className="block text-xs font-semibold text-gray-700 mb-0.5">
             Make <span className="text-red-600">*</span>
@@ -373,11 +428,11 @@ export default function Section1UnitData({
             value={data.make || null}
             onChange={handleMakeChange}
             isLoading={isLoadingModels}
-            disabled={!data.jdPowerManufacturerId}
+            disabled={!data.year}
           />
         </div>
 
-        {/* Model (ModelTrimName from JD Power) */}
+        {/* Model (ModelTrimName from JD Power - depends on Make) */}
         <div>
           <label htmlFor="model" className="block text-xs font-semibold text-gray-700 mb-0.5">
             Model/Floorplan <span className="text-red-600">*</span>
