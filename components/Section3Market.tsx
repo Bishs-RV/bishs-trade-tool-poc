@@ -1,13 +1,23 @@
-'use client';
+'use client'
 
-import { TradeData } from '@/lib/types';
-import { MOCK_COMP_DATA } from '@/lib/constants';
-import { formatCurrency } from '@/lib/calculations';
+import { useEffect, useState, useCallback } from 'react'
+import { TradeData } from '@/lib/types'
+import { formatCurrency } from '@/lib/calculations'
+import ComparableTabs from './ComparableTabs'
+import type { ComparablesResponse, HistoricalComparable, ComparablesMetrics } from '@/lib/types/comparables'
 
 interface Section3Props {
-  data: TradeData;
-  onUpdate: (updates: Partial<TradeData>) => void;
-  isLocked: boolean;
+  data: TradeData
+  onUpdate: (updates: Partial<TradeData>) => void
+  isLocked: boolean
+}
+
+const EMPTY_METRICS: ComparablesMetrics = {
+  avgSoldPrice: null,
+  avgListedPrice: null,
+  avgDaysToSale: null,
+  soldCount: 0,
+  listedCount: 0,
 }
 
 export default function Section3Market({
@@ -15,20 +25,73 @@ export default function Section3Market({
   onUpdate,
   isLocked,
 }: Section3Props) {
-  // Generate RV Trader link
+  const [listedUnits, setListedUnits] = useState<HistoricalComparable[]>([])
+  const [soldUnits, setSoldUnits] = useState<HistoricalComparable[]>([])
+  const [metrics, setMetrics] = useState<ComparablesMetrics>(EMPTY_METRICS)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchComparables = useCallback(async () => {
+    if (!data.make || !data.model || !data.year) {
+      setListedUnits([])
+      setSoldUnits([])
+      setMetrics(EMPTY_METRICS)
+      return
+    }
+
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const params = new URLSearchParams({
+        make: data.make,
+        model: data.model,
+        year: data.year.toString(),
+      })
+
+      const response = await fetch(`/api/comparables?${params}`)
+      if (!response.ok) {
+        throw new Error('Failed to fetch comparables')
+      }
+
+      const result: ComparablesResponse = await response.json()
+      setListedUnits(result.listedUnits)
+      setSoldUnits(result.soldUnits)
+      setMetrics(result.metrics)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error')
+      setListedUnits([])
+      setSoldUnits([])
+      setMetrics(EMPTY_METRICS)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [data.make, data.model, data.year])
+
+  useEffect(() => {
+    if (!isLocked) {
+      fetchComparables()
+    }
+  }, [fetchComparables, isLocked])
+
+  useEffect(() => {
+    if (metrics.avgListedPrice !== null) {
+      onUpdate({ avgListingPrice: metrics.avgListedPrice })
+    }
+  }, [metrics.avgListedPrice, onUpdate])
+
   const generateRVTraderLink = () => {
-    const query = new URLSearchParams({
-      make: data.make || 'RV',
-      model: data.model || 'Unit',
-      year: data.year?.toString() || '',
-    }).toString();
-    return `https://www.rvtrader.com/search?${query}`;
-  };
+    const params = new URLSearchParams()
+    if (data.make) params.set('make', data.make)
+    if (data.model) params.set('model', data.model)
+    if (data.year) params.set('year', data.year.toString())
+    return `https://www.rvtrader.com/search?${params.toString()}`
+  }
 
   return (
     <div className="relative">
       <div className={`bg-white p-4 rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 h-full ${isLocked ? 'pointer-events-none select-none' : ''}`}>
-      
+
       {isLocked && (
         <div className="absolute inset-0 bg-gradient-to-br from-white/95 to-gray-100/95 backdrop-blur-md z-20 rounded-xl flex items-center justify-center pointer-events-auto">
           <div className="text-center border-2 border-dashed border-gray-400 rounded-lg p-4 bg-white/70 shadow-lg">
@@ -50,81 +113,46 @@ export default function Section3Market({
             Market Data Reference
           </h2>
         </div>
-        <div className="space-y-2">
-          {/* Average Listing Price Input */}
-          <div>
-            <label htmlFor="avg-listing-price" className="block text-xs font-semibold text-gray-700 mb-0.5">
-              Average Listing Price
-            </label>
-            <input
-              type="number"
-              id="avg-listing-price"
-              className="mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300"
-              placeholder="e.g., 52000"
-              value={data.avgListingPrice || ''}
-              onChange={(e) => onUpdate({ avgListingPrice: e.target.value ? parseFloat(e.target.value) : 0 })}
-            />
+        <div className="space-y-3">
+          {/* Metrics Summary */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-gray-50 rounded-lg p-2 text-center">
+              <p className="text-xs text-gray-500">Avg Listed</p>
+              <p className="text-sm font-bold text-gray-900">
+                {metrics.avgListedPrice !== null ? formatCurrency(metrics.avgListedPrice) : '----'}
+              </p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-2 text-center">
+              <p className="text-xs text-gray-500">Avg Sold</p>
+              <p className="text-sm font-bold text-green-700">
+                {metrics.avgSoldPrice !== null ? formatCurrency(metrics.avgSoldPrice) : '----'}
+              </p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-2 text-center">
+              <p className="text-xs text-gray-500">Avg Days to Sale</p>
+              <p className="text-sm font-bold text-gray-900">
+                {metrics.avgDaysToSale !== null ? `${metrics.avgDaysToSale}` : '----'}
+              </p>
+            </div>
           </div>
 
-          {/* Bish's Comparable Inventory - READ-ONLY TABLE */}
-          <div>
-            <p className="text-xs font-bold text-gray-800 pt-1 mb-2">
-              Bish&apos;s Comparable Inventory{' '}
-              <span className="font-normal text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                {MOCK_COMP_DATA.length} Comps
-              </span>
-            </p>
-            <div className="mt-0.5 bg-white rounded-lg border border-gray-200 shadow-inner h-96 overflow-y-auto">
-              <table className="min-w-full divide-y divide-gray-200 text-xs">
-                <thead className="sticky top-0 bg-gradient-to-r from-gray-50 to-gray-100 z-10">
-                  <tr>
-                    <th scope="col" className="px-2 py-1.5 text-left text-xs font-bold text-gray-700 uppercase tracking-wide">
-                      Dealership
-                    </th>
-                    <th scope="col" className="px-2 py-1.5 text-left text-xs font-bold text-gray-700 uppercase tracking-wide">
-                      Location
-                    </th>
-                    <th scope="col" className="px-2 py-1.5 text-left text-xs font-bold text-gray-700 uppercase tracking-wide">
-                      Listed Price
-                    </th>
-                    <th scope="col" className="px-2 py-1.5 text-left text-xs font-bold text-gray-700 uppercase tracking-wide">
-                      Sold Price
-                    </th>
-                    <th scope="col" className="px-2 py-1.5 text-left text-xs font-bold text-gray-700 uppercase tracking-wide">
-                      Sold Date
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-100">
-                  {MOCK_COMP_DATA.map((comp, idx) => (
-                    <tr key={idx} className="hover:bg-blue-50 transition-colors duration-150">
-                      <td className="px-2 py-1.5 whitespace-nowrap text-xs">
-                        <a
-                          href={comp.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 hover:underline transition-colors font-medium"
-                        >
-                          {comp.dealership}
-                        </a>
-                      </td>
-                      <td className="px-2 py-1.5 whitespace-nowrap text-xs text-gray-600 font-medium">
-                        {comp.location}
-                      </td>
-                      <td className="px-2 py-1.5 whitespace-nowrap text-xs font-bold text-gray-900">
-                        {comp.listedPrice ? formatCurrency(comp.listedPrice) : '----'}
-                      </td>
-                      <td className="px-2 py-1.5 whitespace-nowrap text-xs font-bold text-green-700">
-                        {comp.soldPrice ? formatCurrency(comp.soldPrice) : '----'}
-                      </td>
-                      <td className="px-2 py-1.5 whitespace-nowrap text-xs text-gray-600">
-                        {comp.soldDate || '----'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {error && (
+            <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
+              {error}
             </div>
+          )}
+
+          {/* Comparable Units Tabs */}
+          <div>
+            <p className="text-xs font-bold text-gray-800 mb-2">
+              Bish&apos;s Historical Comparables
+            </p>
+            <ComparableTabs
+              listedUnits={listedUnits}
+              soldUnits={soldUnits}
+              metrics={metrics}
+              isLoading={isLoading}
+            />
           </div>
 
           {/* RV Trader Link */}
@@ -135,12 +163,12 @@ export default function Section3Market({
               rel="noopener noreferrer"
               className="text-blue-700 hover:text-blue-900 font-bold underline text-sm flex items-center justify-center gap-2 transition-colors"
             >
-              <span>🔍 RV Trader Search for {data.year || ''} {data.make || ''} {data.model || ''}</span>
+              <span>RV Trader Search for {data.year || ''} {data.make || ''} {data.model || ''}</span>
               <span>→</span>
             </a>
           </div>
         </div>
       </div>
     </div>
-  );
+  )
 }
