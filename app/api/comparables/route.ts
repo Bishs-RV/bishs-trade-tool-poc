@@ -9,18 +9,36 @@ const UNIT_STATUS_AVAILABLE = ''
 const MAX_YEAR_RANGE = 10
 const MAX_RESULTS = 50
 
-function normalizeForMatch(str: string): string {
-  return str
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
+const NOISE_WORDS = new Set([
+  'series', 'by', 'inc', 'llc', 'corp', 'corporation', 'co', 'company',
+  'rv', 'rvs', 'trailer', 'trailers', 'motorhome', 'motorhomes',
+  'industries', 'manufacturing', 'mfg',
+])
 
 function buildFuzzyPattern(input: string): string {
-  const normalized = normalizeForMatch(input)
-  const words = normalized.split(' ').filter(w => w.length > 1)
-  return `%${words.join('%')}%`
+  const normalized = input
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, ' ')
+
+  const words = normalized
+    .split(' ')
+    .filter(w => w.length > 1 && !NOISE_WORDS.has(w))
+
+  if (words.length === 0) {
+    return `%${normalized}%`
+  }
+
+  return `%${words[0]}%`
+}
+
+function buildModelPattern(input: string): string {
+  const normalized = input.toLowerCase().trim()
+  // Extract alphanumeric parts for flexible matching
+  // "M-19" should match "M-19", "M19", "M 19"
+  const alphaNum = normalized.replace(/[^a-z0-9]/g, '')
+  return `%${alphaNum}%`
 }
 
 function parseYearSafely(year: string | null): number | null {
@@ -59,9 +77,11 @@ export async function GET(request: NextRequest) {
   const minYear = year - yearRange
   const maxYear = year + yearRange
   const makePattern = buildFuzzyPattern(make)
-  const modelPattern = buildFuzzyPattern(model)
+  const modelPattern = buildModelPattern(model)
 
   try {
+    // Use REGEXP_REPLACE to normalize DB values for comparison
+    // This allows "M-19" in DB to match pattern "%m19%"
     const listedUnitsRaw = await db
       .select({
         id: evoMajorunit.majorUnitHeaderId,
@@ -79,7 +99,7 @@ export async function GET(request: NextRequest) {
       .where(
         and(
           ilike(evoMajorunit.make, makePattern),
-          ilike(evoMajorunit.model, modelPattern),
+          sql`LOWER(REGEXP_REPLACE(${evoMajorunit.model}, '[^a-zA-Z0-9]', '', 'g')) LIKE ${modelPattern}`,
           gte(evoMajorunit.modelYear, minYear),
           lte(evoMajorunit.modelYear, maxYear),
           eq(evoMajorunit.newUsed, UNIT_TYPE_USED),
@@ -113,7 +133,7 @@ export async function GET(request: NextRequest) {
       .where(
         and(
           ilike(evoSalesdealdetailunits.make, makePattern),
-          ilike(evoSalesdealdetailunits.model, modelPattern),
+          sql`LOWER(REGEXP_REPLACE(${evoSalesdealdetailunits.model}, '[^a-zA-Z0-9]', '', 'g')) LIKE ${modelPattern}`,
           gte(sql`CAST(${evoSalesdealdetailunits.year} AS INTEGER)`, minYear),
           lte(sql`CAST(${evoSalesdealdetailunits.year} AS INTEGER)`, maxYear),
           eq(evoSalesdealdetailunits.newused, UNIT_TYPE_USED),
