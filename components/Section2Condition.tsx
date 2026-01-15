@@ -2,6 +2,10 @@
 
 import { TradeData, CalculatedValues } from '@/lib/types';
 import { formatCurrency } from '@/lib/calculations';
+import { Slider } from '@/components/ui/slider';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 interface Section2Props {
   data: TradeData;
@@ -44,18 +48,17 @@ export default function Section2Condition({
         <div className="space-y-6">
           {/* Combined Condition Score 1-9 */}
           <div className="bg-gradient-to-br from-slate-50 to-gray-50 p-4 rounded-xl border border-slate-200">
-            <label htmlFor="condition-score" className="block text-sm font-bold text-gray-800 mb-2">
+            <Label htmlFor="condition-score" className="text-sm font-bold text-gray-800">
               Condition Score (<span className="text-blue-600">1-9 Scale</span>)
-            </label>
-            <input
-              type="range"
+            </Label>
+            <Slider
               id="condition-score"
-              min="1"
-              max="9"
-              step="1"
-              value={data.conditionScore}
-              onChange={(e) => onUpdate({ conditionScore: parseInt(e.target.value) })}
-              className="mt-4 w-full h-2 bg-gradient-to-r from-slate-200 to-slate-300 rounded-lg appearance-none cursor-pointer accent-blue-600 shadow-inner"
+              min={1}
+              max={9}
+              step={1}
+              value={[data.conditionScore]}
+              onValueChange={([val]) => onUpdate({ conditionScore: val })}
+              className="mt-4"
             />
             <div className="flex justify-between text-xs text-gray-500 mt-2">
               <span>1 (Poor)</span>
@@ -68,13 +71,13 @@ export default function Section2Condition({
           <div className="p-3 bg-gradient-to-br from-gray-50 to-slate-50 rounded-lg border border-gray-200 space-y-2">
             {/* Major Issues (Deductions) */}
             <div>
-              <label htmlFor="major-issues" className="block text-sm font-bold text-gray-800 mb-1">
+              <Label htmlFor="major-issues" className="text-sm font-bold text-gray-800">
                 Major Issues (Deductions)
-              </label>
-              <textarea
+              </Label>
+              <Textarea
                 id="major-issues"
                 rows={3}
-                className="mt-1 block w-full rounded-lg border-2 border-gray-200 shadow-sm p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300"
+                className="mt-1"
                 placeholder="List frame damage, non-working AC, or anything requiring substantial cost/reduction."
                 value={data.majorIssues}
                 onChange={(e) => onUpdate({ majorIssues: e.target.value })}
@@ -83,13 +86,13 @@ export default function Section2Condition({
 
             {/* Unit Add-Ons (Value Adds) */}
             <div>
-              <label htmlFor="unit-add-ons" className="block text-sm font-bold text-gray-800 mb-1">
+              <Label htmlFor="unit-add-ons" className="text-sm font-bold text-gray-800">
                 Unit Add-Ons (Value Adds)
-              </label>
-              <textarea
+              </Label>
+              <Textarea
                 id="unit-add-ons"
                 rows={3}
-                className="mt-1 block w-full rounded-lg border-2 border-gray-200 shadow-sm p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300"
+                className="mt-1"
                 placeholder="List high-value aftermarket options (e.g., Solar package, upgraded stabilizer system)."
                 value={data.unitAddOns}
                 onChange={(e) => onUpdate({ unitAddOns: e.target.value })}
@@ -98,17 +101,17 @@ export default function Section2Condition({
 
             {/* Manual Cost Override */}
             <div className="pt-2">
-              <label htmlFor="additional-prep-cost" className="block text-sm font-bold text-gray-800 mb-1">
+              <Label htmlFor="additional-prep-cost" className="text-sm font-bold text-gray-800">
                 Additional Costs Override
-              </label>
+              </Label>
               <div className="mt-1 flex shadow-sm">
-                <span className="inline-flex items-center rounded-l-lg border-2 border-r-0 border-gray-200 bg-gray-100 px-4 text-gray-600 text-sm font-semibold">
+                <span className="inline-flex items-center rounded-l-lg border border-r-0 border-input bg-gray-100 px-4 text-gray-600 text-sm font-semibold">
                   $
                 </span>
-                <input
+                <Input
                   type="number"
                   id="additional-prep-cost"
-                  className="block w-full flex-1 rounded-r-lg border-2 border-gray-200 p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300"
+                  className="rounded-l-none"
                   placeholder="0"
                   value={data.additionalPrepCost || ''}
                   onChange={(e) => onUpdate({ additionalPrepCost: e.target.value ? parseFloat(e.target.value) : 0 })}
@@ -167,9 +170,9 @@ export default function Section2Condition({
 
           {/* Bish's Value (CALCULATED & READ-ONLY DISPLAY) */}
           <div className="bg-gradient-to-br from-gray-100 to-slate-200 rounded-lg p-3 text-center shadow-md border border-gray-300">
-            <label className="block text-xs font-bold text-gray-600 mb-1 uppercase tracking-wide">
+            <span className="block text-xs font-bold text-gray-600 mb-1 uppercase tracking-wide">
               Bish&apos;s Trade-In Value (Base)
-            </label>
+            </span>
             <span className="block text-xl font-black text-gray-900">
               {formatCurrency(calculated.bishTIVBase)}
             </span>
@@ -185,9 +188,9 @@ export default function Section2Condition({
 
           {/* Total Bank Cost */}
           <div className="bg-gradient-to-br from-gray-100 to-slate-200 rounded-lg p-3 text-center shadow-md border border-gray-300">
-            <label className="block text-xs font-bold text-gray-600 mb-1 uppercase tracking-wide">
+            <span className="block text-xs font-bold text-gray-600 mb-1 uppercase tracking-wide">
               Total Bank Cost
-            </label>
+            </span>
             <span className="block text-xl font-black text-gray-900">
               {formatCurrency(calculated.totalUnitCosts)}
             </span>
