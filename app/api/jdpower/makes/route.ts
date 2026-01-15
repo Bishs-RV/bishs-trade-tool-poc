@@ -3,17 +3,10 @@ import { fetchMakes } from '@/lib/jdpower/client'
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
-  const year = searchParams.get('year')
   const rvCategoryId = searchParams.get('rvCategoryId')
 
-  if (!rvCategoryId) {
-    return NextResponse.json(
-      { error: 'rvCategoryId is required' },
-      { status: 400 }
-    )
-  }
-
-  const categoryNum = parseInt(rvCategoryId, 10)
+  // Parse optional category ID (0 = all categories)
+  const categoryNum = rvCategoryId ? parseInt(rvCategoryId, 10) : 0
 
   if (isNaN(categoryNum)) {
     return NextResponse.json(
@@ -22,19 +15,9 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  // If year not provided, use current year (manufacturers available now)
-  const currentYear = new Date().getFullYear()
-  const yearNum = year ? parseInt(year, 10) : currentYear
-
-  if (isNaN(yearNum)) {
-    return NextResponse.json(
-      { error: 'year must be a valid number' },
-      { status: 400 }
-    )
-  }
-
   try {
-    const makes = await fetchMakes(yearNum, categoryNum)
+    // fetchMakes uses sensible defaults for year range (15 years back to next year)
+    const makes = await fetchMakes(undefined, undefined, categoryNum)
     return NextResponse.json({ makes })
   } catch (error: unknown) {
     console.error('Error fetching makes:', error)
