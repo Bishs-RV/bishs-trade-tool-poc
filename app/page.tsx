@@ -304,21 +304,18 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-100 via-blue-50 to-gray-100 p-4 sm:p-8">
-      <div className="max-w-screen-2xl mx-auto">
+    <div className="h-screen overflow-hidden bg-gradient-to-br from-gray-100 via-blue-50 to-gray-100 p-2">
+      <div className="h-full flex flex-col">
         {/* Header */}
-        <header className="relative overflow-hidden text-center mb-12 p-8 bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900 rounded-2xl shadow-2xl border border-slate-600">
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-500/10 to-transparent"></div>
-          <div className="relative z-10">
-            <h1 className="text-5xl font-black text-white tracking-tight mb-2">
-              Bish&apos;s Trade-In Tool
-            </h1>
-            <p className="text-slate-300 text-sm font-medium">Internal Valuation System</p>
-          </div>
-          
+        <header className="relative overflow-hidden text-center mb-2 py-2 px-4 bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900 rounded-lg shadow-lg border border-slate-600 flex-shrink-0">
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-500/10 to-transparent" />
+          <h1 className="relative z-10 text-2xl font-black text-white tracking-tight">
+            Bish&apos;s Trade-In Tool
+          </h1>
+
           {/* User Name Display */}
-          <div className="absolute top-6 right-8 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/20">
-            <p className="text-sm text-white">
+          <div className="absolute top-1/2 -translate-y-1/2 right-4 bg-white/10 backdrop-blur-md px-3 py-1 rounded-full border border-white/20">
+            <p className="text-xs text-white">
               <span className="opacity-80">User:</span>{' '}
               <span className="font-bold">Julian Baden</span>
             </p>
@@ -326,11 +323,11 @@ export default function Home() {
         </header>
 
         {/* Main Form */}
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 gap-2">
           {/* 3-Column Grid for Sections 1, 2, 3 */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 flex-1 min-h-0">
             {/* COLUMN 1: Section 1 - Unit & Base Data */}
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1 overflow-auto">
               <Section1UnitData
                 data={data}
                 calculated={calculated}
@@ -342,7 +339,7 @@ export default function Home() {
             </div>
 
             {/* COLUMN 2: Section 2 - Condition & Prep Costs */}
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1 overflow-auto">
               <Section2Condition
                 data={data}
                 calculated={calculated}
@@ -359,7 +356,7 @@ export default function Home() {
             </div>
 
             {/* COLUMN 3: Section 3 - Market Data */}
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1 overflow-auto">
               <Section3Market
                 data={data}
                 onUpdate={(updates) => handleUpdate(updates, 'avg-listing-price')}
@@ -369,7 +366,7 @@ export default function Home() {
           </div>
 
           {/* Full-Width Section 4 - Valuation Levers */}
-          <div className="mb-6">
+          <div className="flex-shrink-0">
             <Section4Valuation
               data={data}
               calculated={calculated}
@@ -389,43 +386,35 @@ export default function Home() {
             />
           </div>
 
-          {/* Notes Section */}
-          <div className="mt-8 p-6 bg-white rounded-2xl shadow-xl border border-gray-200">
-            <h2 className="text-xl font-bold mb-4 text-gray-900 flex items-center gap-2">
-              <span>📝</span>
-              <span>Valuation Notes</span>
-            </h2>
-            <textarea
-              id="valuation-notes"
-              rows={3}
-              className="mt-1 block w-full rounded-xl border-2 border-gray-200 shadow-sm p-4 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300 disabled:bg-gray-50 disabled:cursor-not-allowed"
-              placeholder="Document customer negotiations, final sign-off, or special terms here."
-              value={data.valuationNotes}
-              onChange={(e) => setData({ ...data, valuationNotes: e.target.value })}
-              disabled={!isLookupComplete}
-            />
-          </div>
-
-          {/* Submit Button */}
-          <div className="mt-6">
+          {/* Notes + Submit Row */}
+          <div className="flex-shrink-0 flex gap-2">
+            <div className="flex-1 p-2 bg-white rounded-lg shadow-md border border-gray-200">
+              <textarea
+                id="valuation-notes"
+                rows={2}
+                className="w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 hover:border-blue-300 disabled:bg-gray-50 disabled:cursor-not-allowed resize-none"
+                placeholder="Valuation notes: negotiations, sign-off, special terms..."
+                value={data.valuationNotes}
+                onChange={(e) => setData({ ...data, valuationNotes: e.target.value })}
+                disabled={!isLookupComplete}
+              />
+            </div>
             <button
               type="submit"
-              className="w-full py-5 text-xl text-white font-black rounded-2xl shadow-2xl bg-gradient-to-r from-slate-600 via-slate-700 to-slate-800 hover:from-slate-700 hover:via-slate-800 hover:to-slate-900 transition-all transform hover:scale-[1.02] active:scale-[0.98] border border-slate-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              className="px-8 py-3 text-lg text-white font-bold rounded-lg shadow-lg bg-gradient-to-r from-slate-600 via-slate-700 to-slate-800 hover:from-slate-700 hover:via-slate-800 hover:to-slate-900 hover:scale-[1.02] active:scale-[0.98] border border-slate-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex-shrink-0"
               disabled={!isLookupComplete || isSubmitting}
             >
-              <span className="flex items-center justify-center gap-3">
-                {isSubmitting ? (
-                  <>
-                    <span className="animate-spin">⏳</span>
-                    <span>SAVING...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>SUBMIT VALUATION</span>
-                    <span className="text-2xl">→</span>
-                  </>
-                )}
-              </span>
+              {isSubmitting ? (
+                <span className="flex items-center gap-2">
+                  <span className="animate-spin">⏳</span>
+                  <span>SAVING...</span>
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <span>SUBMIT</span>
+                  <span className="text-xl">→</span>
+                </span>
+              )}
             </button>
           </div>
         </form>
