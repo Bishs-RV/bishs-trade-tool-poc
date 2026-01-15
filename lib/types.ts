@@ -21,6 +21,14 @@ export interface TradeData {
   jdPowerManufacturerId: number | null;
   jdPowerModelTrimId: number | null;
 
+  // Manufacturer name (stored regardless of JD Power or custom selection)
+  manufacturerName: string;
+
+  // Custom input values (for fuzzy matching when JD Power doesn't have the unit)
+  customManufacturer?: string;
+  customMake?: string;
+  customModel?: string;
+
   // Section 2: Condition & Prep Costs
   conditionScore: number;
   majorIssues: string;

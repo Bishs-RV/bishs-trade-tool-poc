@@ -118,6 +118,7 @@ export default function Section1UnitData({
     setModelTrims([]);
     onUpdateRef.current({
       jdPowerManufacturerId: null,
+      manufacturerName: '',
       year: null,
       make: '',
       model: '',
@@ -207,8 +208,7 @@ export default function Section1UnitData({
       }
     };
 
-    fetchModels();
-    // Reset make/model selections when year changes
+    // Reset make/model selections when year changes (before fetch to avoid race condition)
     setModelTrims([]);
     onUpdateRef.current({
       make: '',
@@ -216,19 +216,40 @@ export default function Section1UnitData({
       jdPowerModelTrimId: null,
     });
 
+    fetchModels();
+
     return () => abortController.abort();
   }, [data.year, data.jdPowerManufacturerId, data.rvType]);
 
-  const isLookupReady =
-    data.year !== null &&
-    data.jdPowerManufacturerId !== null &&
-    data.make.trim() !== '' &&
-    data.model.trim() !== '' &&
-    data.rvType !== null &&
-    data.jdPowerModelTrimId !== null;
+  // Check if we're in custom input mode (any custom values set)
+  const isCustomInputMode =
+    data.customManufacturer !== undefined ||
+    data.customMake !== undefined ||
+    data.customModel !== undefined;
+
+  // For standard JD Power flow, need modelTrimId
+  // For custom input flow, need year, manufacturer name, and model name
+  const isLookupReady = isCustomInputMode
+    ? data.year !== null &&
+      (data.customManufacturer || data.jdPowerManufacturerId !== null) &&
+      data.model.trim() !== '' &&
+      data.rvType !== null
+    : data.year !== null &&
+      data.jdPowerManufacturerId !== null &&
+      data.make.trim() !== '' &&
+      data.model.trim() !== '' &&
+      data.rvType !== null &&
+      data.jdPowerModelTrimId !== null;
 
   const handleYearChange = (option: ComboboxOption) => {
-    onUpdate({ year: parseInt(option.value, 10) });
+    // Handle custom year input (user typed a year not in list)
+    const yearValue = option.isCustom
+      ? parseInt(option.label, 10)
+      : parseInt(option.value, 10);
+
+    if (!isNaN(yearValue) && yearValue >= 1980 && yearValue <= 2100) {
+      onUpdate({ year: yearValue });
+    }
   };
 
   const handleRvTypeChange = (value: string) => {
@@ -236,24 +257,56 @@ export default function Section1UnitData({
   };
 
   const handleManufacturerChange = (option: ComboboxOption) => {
-    onUpdate({ jdPowerManufacturerId: parseInt(option.value, 10) });
+    if (option.isCustom) {
+      // Custom manufacturer - store the label as the manufacturer name
+      onUpdate({
+        jdPowerManufacturerId: null,
+        manufacturerName: option.label,
+        customManufacturer: option.label,
+      });
+    } else {
+      onUpdate({
+        jdPowerManufacturerId: parseInt(option.value, 10),
+        manufacturerName: option.label,
+        customManufacturer: undefined,
+      });
+    }
   };
 
   const handleMakeChange = (option: ComboboxOption) => {
-    onUpdate({
-      make: option.value,
-      model: '',
-      jdPowerModelTrimId: null,
-    });
+    if (option.isCustom) {
+      onUpdate({
+        make: option.label,
+        customMake: option.label,
+        model: '',
+        jdPowerModelTrimId: null,
+      });
+    } else {
+      onUpdate({
+        make: option.value,
+        customMake: undefined,
+        model: '',
+        jdPowerModelTrimId: null,
+      });
+    }
   };
 
   const handleModelChange = (option: ComboboxOption) => {
-    const selectedModel = modelTrims.find(m => m.ModelTrimID.toString() === option.value);
-    if (selectedModel) {
+    if (option.isCustom) {
       onUpdate({
-        model: selectedModel.ModelTrimName,
-        jdPowerModelTrimId: selectedModel.ModelTrimID,
+        model: option.label,
+        customModel: option.label,
+        jdPowerModelTrimId: null,
       });
+    } else {
+      const selectedModel = modelTrims.find(m => m.ModelTrimID.toString() === option.value);
+      if (selectedModel) {
+        onUpdate({
+          model: selectedModel.ModelTrimName,
+          customModel: undefined,
+          jdPowerModelTrimId: selectedModel.ModelTrimID,
+        });
+      }
     }
   };
 
@@ -389,14 +442,15 @@ export default function Section1UnitData({
             placeholder="Select Manufacturer"
             searchPlaceholder="Search manufacturers..."
             options={manufacturerOptions}
-            value={data.jdPowerManufacturerId?.toString() ?? null}
+            value={data.customManufacturer ? `custom:${data.customManufacturer}` : data.jdPowerManufacturerId?.toString() ?? null}
             onChange={handleManufacturerChange}
             isLoading={isLoadingMakes}
             disabled={!data.rvType}
+            allowCustom={true}
           />
         </div>
 
-        {/* Year - from JD Power (depends on Manufacturer) */}
+        {/* Year - from JD Power (depends on Manufacturer) or custom entry */}
         <div>
           <label htmlFor="year" className="block text-xs font-semibold text-gray-700 mb-0.5">
             Year <span className="text-red-600">*</span>
@@ -410,7 +464,8 @@ export default function Section1UnitData({
             value={data.year?.toString() ?? null}
             onChange={handleYearChange}
             isLoading={isLoadingYears}
-            disabled={!data.jdPowerManufacturerId}
+            disabled={!data.jdPowerManufacturerId && !data.customManufacturer}
+            allowCustom={true}
           />
         </div>
 
@@ -425,10 +480,11 @@ export default function Section1UnitData({
             placeholder="Select Make"
             searchPlaceholder="Search makes..."
             options={makeOptions}
-            value={data.make || null}
+            value={data.customMake ? `custom:${data.customMake}` : data.make || null}
             onChange={handleMakeChange}
             isLoading={isLoadingModels}
-            disabled={!data.year}
+            disabled={!data.year && !data.customManufacturer}
+            allowCustom={true}
           />
         </div>
 
@@ -443,9 +499,10 @@ export default function Section1UnitData({
             placeholder="Select Model"
             searchPlaceholder="Search models..."
             options={modelOptions}
-            value={data.jdPowerModelTrimId?.toString() ?? null}
+            value={data.customModel ? `custom:${data.customModel}` : data.jdPowerModelTrimId?.toString() ?? null}
             onChange={handleModelChange}
-            disabled={!data.make}
+            disabled={!data.make && !data.customMake}
+            allowCustom={true}
           />
         </div>
 

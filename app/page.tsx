@@ -28,6 +28,7 @@ export default function Home() {
     originalListPrice: null,
     jdPowerManufacturerId: null,
     jdPowerModelTrimId: null,
+    manufacturerName: '',
     conditionScore: 8,
     majorIssues: '',
     unitAddOns: '',
@@ -122,23 +123,52 @@ export default function Home() {
   };
 
   const handleLookup = async () => {
-    if (!data.jdPowerModelTrimId) {
+    // Check if we're in custom input mode
+    const isCustomInputMode =
+      data.customManufacturer !== undefined ||
+      data.customMake !== undefined ||
+      data.customModel !== undefined;
+
+    if (!isCustomInputMode && !data.jdPowerModelTrimId) {
       alert('Please select a model to get trade value');
       return;
     }
 
     setIsLoading(true);
     try {
-      // Fetch trade value from BishConnect API
-      const params = new URLSearchParams({
-        modelTrimId: data.jdPowerModelTrimId.toString(),
-        condition: data.conditionScore.toString(),
-      });
-      if (data.mileage) {
-        params.set('mileage', data.mileage.toString());
+      let response: Response;
+
+      if (isCustomInputMode) {
+        // Use fuzzy match endpoint for custom inputs
+        // All name fields (manufacturerName, make, model) are stored regardless of JD Power vs custom
+        const params = new URLSearchParams({
+          year: data.year!.toString(),
+          manufacturer: data.manufacturerName,
+          model: data.model,
+          condition: data.conditionScore.toString(),
+        });
+        if (data.make) {
+          params.set('make', data.make);
+        }
+        if (data.mileage) {
+          params.set('mileage', data.mileage.toString());
+        }
+
+        console.log('[handleLookup] Using fuzzy match with params:', Object.fromEntries(params));
+        response = await fetch(`/api/trade-value/fuzzy?${params}`);
+      } else {
+        // Standard JD Power lookup
+        const params = new URLSearchParams({
+          modelTrimId: data.jdPowerModelTrimId!.toString(),
+          condition: data.conditionScore.toString(),
+        });
+        if (data.mileage) {
+          params.set('mileage', data.mileage.toString());
+        }
+
+        response = await fetch(`/api/trade-value?${params}`);
       }
 
-      const response = await fetch(`/api/trade-value?${params}`);
       if (!response.ok) {
         throw new Error('Failed to fetch trade value');
       }
@@ -146,18 +176,11 @@ export default function Home() {
       const result = await response.json();
       console.log('[handleLookup] API response:', result);
 
-      // Validate the response has required fields
-      if (typeof result.jdPowerTradeIn !== 'number' || !isFinite(result.jdPowerTradeIn) || result.jdPowerTradeIn <= 0) {
-        throw new Error('Invalid JD Power trade value from API');
-      }
-      if (typeof result.bishAdjustedTradeIn !== 'number' || !isFinite(result.bishAdjustedTradeIn) || result.bishAdjustedTradeIn <= 0) {
-        throw new Error('Invalid Bish adjusted trade value from API');
-      }
-
+      // Use trade values from response, defaulting to 0 if not found (custom input may not have values)
       const newTradeValues: TradeValues = {
-        jdPowerTradeIn: result.jdPowerTradeIn,
-        bishAdjustedTradeIn: result.bishAdjustedTradeIn,
-        usedRetail: result.usedRetail,
+        jdPowerTradeIn: result.jdPowerTradeIn ?? 0,
+        bishAdjustedTradeIn: result.bishAdjustedTradeIn ?? 0,
+        usedRetail: result.usedRetail ?? 0,
         valuationResults: result.valuationResults,
       };
       console.log('[handleLookup] Trade values received:', newTradeValues);
@@ -165,9 +188,11 @@ export default function Home() {
       // Store the trade values for future recalculations
       setTradeValues(newTradeValues);
 
-      // Update with real trade value and trigger recalculation
+      // Update with trade value (or 0 if no match) and trigger recalculation
       const updates: Partial<TradeData> = {
-        avgListingPrice: newTradeValues.bishAdjustedTradeIn * 1.15,
+        avgListingPrice: newTradeValues.bishAdjustedTradeIn > 0
+          ? newTradeValues.bishAdjustedTradeIn * 1.15
+          : data.avgListingPrice,
       };
 
       console.log('[handleLookup] Calling recalculate with tradeValues:', newTradeValues);
@@ -175,7 +200,8 @@ export default function Home() {
       setIsLookupComplete(true);
     } catch (error: unknown) {
       console.error('Lookup error:', error);
-      alert('Failed to fetch trade value. Please try again.');
+      // Still allow user to continue even if lookup fails
+      setIsLookupComplete(true);
     } finally {
       setIsLoading(false);
     }

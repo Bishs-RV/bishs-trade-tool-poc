@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 export type ComboboxOption = {
   value: string;
   label: string;
+  isCustom?: boolean;
 };
 
 type SearchableComboboxProps = {
@@ -31,6 +32,7 @@ type SearchableComboboxProps = {
   onChange: (option: ComboboxOption) => void;
   isLoading?: boolean;
   disabled?: boolean;
+  allowCustom?: boolean;
 };
 
 export function SearchableCombobox({
@@ -44,8 +46,10 @@ export function SearchableCombobox({
   onChange,
   isLoading = false,
   disabled = false,
+  allowCustom = false,
 }: SearchableComboboxProps) {
   const [open, setOpen] = useState(false);
+  const [searchValue, setSearchValue] = useState('');
 
   const handleSelect = (option: ComboboxOption) => {
     if (option.value === value) {
@@ -53,12 +57,27 @@ export function SearchableCombobox({
       return;
     }
     onChange(option);
+    setSearchValue('');
     setOpen(false);
   };
 
+  const handleCustomSelect = () => {
+    const trimmed = searchValue.trim();
+    if (trimmed) {
+      onChange({ value: `custom:${trimmed}`, label: trimmed, isCustom: true });
+      setSearchValue('');
+      setOpen(false);
+    }
+  };
+
   const hasOptions = options && options.length > 0;
-  const isDisabled = disabled || !hasOptions || isLoading;
-  const currentLabel = options?.find((item) => item.value === value)?.label;
+  const isDisabled = disabled || (!hasOptions && !allowCustom) || isLoading;
+
+  // Check if current value is a custom value or find in options
+  const isCustomValue = value?.startsWith('custom:') ?? false;
+  const currentLabel = isCustomValue && value
+    ? value.replace('custom:', '')
+    : options?.find((item) => item.value === value)?.label ?? value;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -81,11 +100,25 @@ export function SearchableCombobox({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-        <Command>
-          <CommandInput placeholder={searchPlaceholder ?? `Search ${label}...`} />
+        <Command shouldFilter={true}>
+          <CommandInput
+            placeholder={searchPlaceholder ?? `Search ${label}...`}
+            value={searchValue}
+            onValueChange={setSearchValue}
+          />
           <CommandList>
             <CommandEmpty>{emptyMessage ?? `No ${label} found.`}</CommandEmpty>
             <CommandGroup>
+              {/* Custom input option - first when typing */}
+              {allowCustom && searchValue.trim() && (
+                <CommandItem
+                  value={searchValue.trim()}
+                  onSelect={() => handleCustomSelect()}
+                  className="cursor-pointer"
+                >
+                  Use &ldquo;{searchValue.trim()}&rdquo; as custom value
+                </CommandItem>
+              )}
               {options?.map((option) => (
                 <CommandItem
                   key={option.value}

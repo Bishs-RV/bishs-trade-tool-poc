@@ -40,15 +40,22 @@ async function fetchJDPowerData<T>(url: string): Promise<T> {
 }
 
 /**
- * Fetch manufacturers (makes) for a given year and RV category
- * @param year - The model year
- * @param rvCategoryId - The RV category ID (1-6)
+ * Fetch manufacturers (makes) for a year range and RV category
+ * @param fromYear - Starting year (defaults to 15 years ago)
+ * @param toYear - Ending year (defaults to next year)
+ * @param rvCategoryId - The RV category ID (1-6), 0 for all
  */
 export async function fetchMakes(
-  year: number,
-  rvCategoryId: number
+  fromYear?: number,
+  toYear?: number,
+  rvCategoryId?: number
 ): Promise<MakeCategory[]> {
-  const url = `${JDPOWER_BASE_URL}/Makes/${year}/${year}/${rvCategoryId}`
+  const currentYear = new Date().getFullYear()
+  const from = fromYear ?? currentYear - 14
+  const to = toYear ?? currentYear + 1
+  const categoryId = rvCategoryId ?? 0
+
+  const url = `${JDPOWER_BASE_URL}/Makes/${from}/${to}/${categoryId}`
   const data = await fetchJDPowerData<GetMakesResponse>(url)
   return data.GetMakesResult.MakeCategoryList
 }

@@ -99,3 +99,119 @@ export async function getTradeValue({
 
   return result
 }
+
+// Fuzzy match params for custom input
+interface FuzzyTradeValueParams {
+  year: number
+  manufacturer: string
+  model: string
+  make?: string
+  mileage?: number
+  condition?: number // 1-10 scale, defaults to 5
+  unitClass?: string // TT, FW, A, C
+}
+
+interface FuzzyTradeValueResponse {
+  values?: {
+    trade_in: number
+    base_trade_in: number
+    used_retail: number
+  }
+  valuation_result?: ValuationResult
+  valuation_results?: Record<string, ValuationResult>
+  unit_info?: {
+    year: number
+    manufacturer: string
+    model: string
+    make?: string
+  }
+  matched?: boolean
+  error?: string
+}
+
+/**
+ * Get trade-in values from BishConnect using fuzzy matching
+ * Use this when JD Power lookup fails and user enters custom values
+ */
+export async function getFuzzyTradeValue({
+  year,
+  manufacturer,
+  model,
+  make,
+  mileage,
+  condition = 5,
+  unitClass,
+}: FuzzyTradeValueParams): Promise<TradeValueResult & { matched: boolean }> {
+  const apiUrl = process.env.BISHCONNECT_API_URL
+
+  if (!apiUrl) {
+    throw new Error('BISHCONNECT_API_URL must be set')
+  }
+
+  const token = await getBishConnectToken()
+
+  const url = new URL(`${apiUrl}/trade-value/`)
+  url.searchParams.set('year', year.toString())
+  url.searchParams.set('manufacturer', manufacturer)
+  url.searchParams.set('model', model)
+  if (make) {
+    url.searchParams.set('make', make)
+  }
+  if (mileage !== undefined) {
+    url.searchParams.set('mileage', mileage.toString())
+  }
+  url.searchParams.set('condition', condition.toString())
+  if (unitClass) {
+    url.searchParams.set('unit_class', unitClass)
+  }
+
+  console.log('[BishConnect] Fuzzy matching trade value from:', url.toString())
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
+    },
+  })
+
+  // Handle 404 as "no match found" instead of throwing
+  if (response.status === 404) {
+    console.log('[BishConnect] Fuzzy match: No matching RV model found')
+    return {
+      jdPowerTradeIn: 0,
+      bishAdjustedTradeIn: 0,
+      usedRetail: 0,
+      matched: false,
+    }
+  }
+
+  if (!response.ok) {
+    const errorBody = await response.text()
+    throw new Error(`BishConnect fuzzy match error: ${response.status} ${response.statusText} - ${errorBody}`)
+  }
+
+  const data = (await response.json()) as FuzzyTradeValueResponse
+  console.log('[BishConnect] Fuzzy match response:', JSON.stringify(data, null, 2))
+
+  // If no match found, return zero values with matched=false
+  if (!data.values || !data.matched) {
+    return {
+      jdPowerTradeIn: 0,
+      bishAdjustedTradeIn: 0,
+      usedRetail: 0,
+      matched: false,
+    }
+  }
+
+  // Get the condition-specific valuation result if available
+  const conditionKey = condition.toString()
+  const conditionResult = data.valuation_results?.[conditionKey] ?? data.valuation_result
+
+  return {
+    jdPowerTradeIn: data.values.base_trade_in,
+    bishAdjustedTradeIn: conditionResult?.adjusted_value ?? data.values.trade_in,
+    usedRetail: data.values.used_retail,
+    valuationResults: data.valuation_results,
+    matched: true,
+  }
+}
