@@ -5,7 +5,7 @@ export interface TradeData {
   customerName: string;
   customerPhone: string;
   customerEmail: string;
-  
+
   // Section 1: Unit & Base Data
   stockNumber: string;
   location: string;
@@ -16,6 +16,18 @@ export interface TradeData {
   rvType: RVType;
   mileage: number | null;
   originalListPrice: number | null;
+
+  // JD Power IDs (for API lookups)
+  jdPowerManufacturerId: number | null;
+  jdPowerModelTrimId: number | null;
+
+  // Manufacturer name (stored regardless of JD Power or custom selection)
+  manufacturerName: string;
+
+  // Custom input values (for fuzzy matching when JD Power doesn't have the unit)
+  customManufacturer?: string;
+  customMake?: string;
+  customModel?: string;
 
   // Section 2: Condition & Prep Costs
   conditionScore: number;
@@ -51,16 +63,19 @@ export interface ComparableUnit {
 }
 
 export interface CalculatedValues {
-  // JD Power Values
+  // JD Power Values (raw from NADA)
   jdPowerTradeIn: number;
   jdPowerRetailValue: number;
-  
+
+  // Bish Adjusted Trade-In (after depreciation)
+  bishAdjustedTradeIn: number;
+
   // Prep Costs Breakdown
   pdiCost: number;
   reconCost: number;
   soldPrepCost: number;
   totalPrepCosts: number;
-  
+
   // Bish's Values
   bishTIVBase: number;
   totalUnitCosts: number;

@@ -1,8 +1,19 @@
 'use client';
 
-import { TradeData, CalculatedValues } from '@/lib/types';
-import { LOCATIONS, RV_TYPE_OPTIONS, RV_MAKES, RV_MODELS, isMotorized } from '@/lib/constants';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { TradeData, CalculatedValues, RVType } from '@/lib/types';
+import { LOCATIONS, RV_TYPE_OPTIONS, isMotorized } from '@/lib/constants';
 import { formatCurrency } from '@/lib/calculations';
+import { getCategoryId } from '@/lib/jdpower/rv-types';
+import type { MakeCategory, ModelTrim } from '@/lib/jdpower/types';
+import { SearchableCombobox, type ComboboxOption } from '@/components/ui/searchable-combobox';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface Section1Props {
   data: TradeData;
@@ -10,6 +21,7 @@ interface Section1Props {
   onUpdate: (updates: Partial<TradeData>) => void;
   onLookup: () => void;
   isLookupComplete: boolean;
+  isLoading?: boolean;
 }
 
 export default function Section1UnitData({
@@ -18,15 +30,285 @@ export default function Section1UnitData({
   onUpdate,
   onLookup,
   isLookupComplete,
+  isLoading = false,
 }: Section1Props) {
   const isMileageEnabled = isMotorized(data.rvType);
-  
-  const isLookupReady = 
-    data.year !== null &&
-    data.make.trim() !== '' &&
-    data.model.trim() !== '' &&
-    data.vin.trim() !== '' &&
-    data.rvType !== null;
+
+  // JD Power cascading data
+  const [manufacturers, setManufacturers] = useState<MakeCategory[]>([]);
+  const [years, setYears] = useState<number[]>([]);
+  const [modelTrims, setModelTrims] = useState<ModelTrim[]>([]);
+  const [isLoadingMakes, setIsLoadingMakes] = useState(false);
+  const [isLoadingYears, setIsLoadingYears] = useState(false);
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
+
+  // Use ref to avoid onUpdate in dependency arrays (prevents infinite loops)
+  const onUpdateRef = useRef(onUpdate);
+  useEffect(() => { onUpdateRef.current = onUpdate; });
+
+  // Derived data for dropdowns
+  const uniqueMakes = Array.from(new Set(modelTrims.map(m => m.ModelSeries))).filter(Boolean).sort();
+  const filteredModels = modelTrims.filter(m => m.ModelSeries === data.make);
+
+  // Memoized options for comboboxes
+  const yearOptions = useMemo<ComboboxOption[]>(
+    () => years.map(y => ({ value: y.toString(), label: y.toString() })),
+    [years]
+  );
+
+  const manufacturerOptions = useMemo<ComboboxOption[]>(
+    () => manufacturers.map(m => ({
+      value: m.makeReturnTO.MakeID.toString(),
+      label: m.makeReturnTO.MakeDisplayName,
+    })),
+    [manufacturers]
+  );
+
+  const makeOptions = useMemo<ComboboxOption[]>(
+    () => uniqueMakes.map(make => ({ value: make, label: make })),
+    [uniqueMakes]
+  );
+
+  const modelOptions = useMemo<ComboboxOption[]>(
+    () => filteredModels.map(model => ({
+      value: model.ModelTrimID.toString(),
+      label: model.ModelTrimName,
+    })),
+    [filteredModels]
+  );
+
+  // Fetch manufacturers when RV type changes
+  useEffect(() => {
+    if (!data.rvType) {
+      setManufacturers([]);
+      return;
+    }
+
+    const abortController = new AbortController();
+
+    const fetchMakes = async () => {
+      setIsLoadingMakes(true);
+      try {
+        const categoryId = getCategoryId(data.rvType);
+        // Fetch manufacturers for current year (no year filter needed)
+        const response = await fetch(
+          `/api/jdpower/makes?rvCategoryId=${categoryId}`,
+          { signal: abortController.signal }
+        );
+        if (!response.ok) throw new Error('Failed to fetch manufacturers');
+        const result = await response.json();
+        if (!abortController.signal.aborted) {
+          setManufacturers(result.makes || []);
+        }
+      } catch (error) {
+        if (!abortController.signal.aborted) {
+          console.error('Error fetching manufacturers:', error);
+          setManufacturers([]);
+        }
+      } finally {
+        if (!abortController.signal.aborted) {
+          setIsLoadingMakes(false);
+        }
+      }
+    };
+
+    fetchMakes();
+    // Reset downstream selections when RV type changes
+    setYears([]);
+    setModelTrims([]);
+    onUpdateRef.current({
+      jdPowerManufacturerId: null,
+      manufacturerName: '',
+      year: null,
+      make: '',
+      model: '',
+      jdPowerModelTrimId: null,
+    });
+
+    return () => abortController.abort();
+  }, [data.rvType]);
+
+  // Fetch years when manufacturer changes
+  useEffect(() => {
+    if (!data.jdPowerManufacturerId) {
+      setYears([]);
+      return;
+    }
+
+    const abortController = new AbortController();
+
+    const fetchYearsData = async () => {
+      setIsLoadingYears(true);
+      try {
+        const response = await fetch(
+          `/api/jdpower/years?makeId=${data.jdPowerManufacturerId}`,
+          { signal: abortController.signal }
+        );
+        if (!response.ok) throw new Error('Failed to fetch years');
+        const result = await response.json();
+        if (!abortController.signal.aborted) {
+          setYears(result.years || []);
+        }
+      } catch (error) {
+        if (!abortController.signal.aborted) {
+          console.error('Error fetching years:', error);
+          setYears([]);
+        }
+      } finally {
+        if (!abortController.signal.aborted) {
+          setIsLoadingYears(false);
+        }
+      }
+    };
+
+    fetchYearsData();
+    // Reset downstream selections when manufacturer changes
+    setModelTrims([]);
+    onUpdateRef.current({
+      year: null,
+      make: '',
+      model: '',
+      jdPowerModelTrimId: null,
+    });
+
+    return () => abortController.abort();
+  }, [data.jdPowerManufacturerId]);
+
+  // Fetch model trims when year changes (manufacturer already selected)
+  useEffect(() => {
+    if (!data.year || !data.rvType || !data.jdPowerManufacturerId) {
+      setModelTrims([]);
+      return;
+    }
+
+    const abortController = new AbortController();
+
+    const fetchModels = async () => {
+      setIsLoadingModels(true);
+      try {
+        const categoryId = getCategoryId(data.rvType);
+        const response = await fetch(
+          `/api/jdpower/model-trims?makeId=${data.jdPowerManufacturerId}&year=${data.year}&rvCategoryId=${categoryId}`,
+          { signal: abortController.signal }
+        );
+        if (!response.ok) throw new Error('Failed to fetch models');
+        const result = await response.json();
+        if (!abortController.signal.aborted) {
+          setModelTrims(result.modelTrims || []);
+        }
+      } catch (error) {
+        if (!abortController.signal.aborted) {
+          console.error('Error fetching models:', error);
+          setModelTrims([]);
+        }
+      } finally {
+        if (!abortController.signal.aborted) {
+          setIsLoadingModels(false);
+        }
+      }
+    };
+
+    // Reset make/model selections when year changes (before fetch to avoid race condition)
+    setModelTrims([]);
+    onUpdateRef.current({
+      make: '',
+      model: '',
+      jdPowerModelTrimId: null,
+    });
+
+    fetchModels();
+
+    return () => abortController.abort();
+  }, [data.year, data.jdPowerManufacturerId, data.rvType]);
+
+  // Check if we're in custom input mode (any custom values set)
+  const isCustomInputMode =
+    data.customManufacturer !== undefined ||
+    data.customMake !== undefined ||
+    data.customModel !== undefined;
+
+  // For standard JD Power flow, need modelTrimId
+  // For custom input flow, need year, manufacturer name, and model name
+  const isLookupReady = isCustomInputMode
+    ? data.year !== null &&
+      (data.customManufacturer || data.jdPowerManufacturerId !== null) &&
+      data.model.trim() !== '' &&
+      data.rvType !== null
+    : data.year !== null &&
+      data.jdPowerManufacturerId !== null &&
+      data.make.trim() !== '' &&
+      data.model.trim() !== '' &&
+      data.rvType !== null &&
+      data.jdPowerModelTrimId !== null;
+
+  const handleYearChange = (option: ComboboxOption) => {
+    // Handle custom year input (user typed a year not in list)
+    const yearValue = option.isCustom
+      ? parseInt(option.label, 10)
+      : parseInt(option.value, 10);
+
+    if (!isNaN(yearValue) && yearValue >= 1980 && yearValue <= 2100) {
+      onUpdate({ year: yearValue });
+    }
+  };
+
+  const handleRvTypeChange = (value: string) => {
+    onUpdate({ rvType: value as RVType, mileage: null });
+  };
+
+  const handleManufacturerChange = (option: ComboboxOption) => {
+    if (option.isCustom) {
+      // Custom manufacturer - store the label as the manufacturer name
+      onUpdate({
+        jdPowerManufacturerId: null,
+        manufacturerName: option.label,
+        customManufacturer: option.label,
+      });
+    } else {
+      onUpdate({
+        jdPowerManufacturerId: parseInt(option.value, 10),
+        manufacturerName: option.label,
+        customManufacturer: undefined,
+      });
+    }
+  };
+
+  const handleMakeChange = (option: ComboboxOption) => {
+    if (option.isCustom) {
+      onUpdate({
+        make: option.label,
+        customMake: option.label,
+        model: '',
+        jdPowerModelTrimId: null,
+      });
+    } else {
+      onUpdate({
+        make: option.value,
+        customMake: undefined,
+        model: '',
+        jdPowerModelTrimId: null,
+      });
+    }
+  };
+
+  const handleModelChange = (option: ComboboxOption) => {
+    if (option.isCustom) {
+      onUpdate({
+        model: option.label,
+        customModel: option.label,
+        jdPowerModelTrimId: null,
+      });
+    } else {
+      const selectedModel = modelTrims.find(m => m.ModelTrimID.toString() === option.value);
+      if (selectedModel) {
+        onUpdate({
+          model: selectedModel.ModelTrimName,
+          customModel: undefined,
+          jdPowerModelTrimId: selectedModel.ModelTrimID,
+        });
+      }
+    }
+  };
 
   return (
     <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 h-full">
@@ -34,32 +316,13 @@ export default function Section1UnitData({
         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-500 to-slate-700 flex items-center justify-center text-white font-bold text-sm shadow-lg">
           1
         </div>
-        <h2 className="text-lg font-bold text-gray-900">
-          Unit & Base Data
-        </h2>
+        <h2 className="text-lg font-bold text-gray-900">Unit & Base Data</h2>
       </div>
       <div className="space-y-2">
         {/* Customer Info Section */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-xs font-bold text-blue-900 uppercase tracking-wide">Customer Info</h3>
-            <button
-              type="button"
-              onClick={() => {
-                // Mock lookup - in production this would search for prior valuations
-                if (data.customerPhone || data.customerEmail) {
-                  alert('Customer lookup feature coming soon! This will search for prior valuations by phone/email.');
-                }
-              }}
-              disabled={!data.customerPhone && !data.customerEmail}
-              className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
-                data.customerPhone || data.customerEmail
-                  ? 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }`}
-            >
-              Load Prior Valuation
-            </button>
           </div>
           <div className="grid grid-cols-3 gap-2">
             <div>
@@ -101,7 +364,7 @@ export default function Section1UnitData({
           </div>
         </div>
 
-        {/* Stock Number and VIN on same line */}
+        {/* Stock Number and VIN */}
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label htmlFor="stock-number" className="block text-xs font-semibold text-gray-700 mb-0.5">
@@ -116,7 +379,6 @@ export default function Section1UnitData({
               onChange={(e) => onUpdate({ stockNumber: e.target.value })}
             />
           </div>
-
           <div>
             <label htmlFor="vin" className="block text-xs font-semibold text-gray-700 mb-0.5">
               VIN
@@ -127,14 +389,13 @@ export default function Section1UnitData({
               maxLength={17}
               className="mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300 font-mono"
               placeholder="17-Digit VIN"
-              required
               value={data.vin}
               onChange={(e) => onUpdate({ vin: e.target.value.toUpperCase() })}
             />
           </div>
         </div>
 
-        {/* Location Dropdown */}
+        {/* Location */}
         <div>
           <label htmlFor="location" className="block text-xs font-semibold text-gray-700 mb-0.5">
             Location <span className="text-red-600">*</span>
@@ -153,77 +414,99 @@ export default function Section1UnitData({
           </select>
         </div>
 
-        {/* Year, RV Type */}
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label htmlFor="year" className="block text-xs font-semibold text-gray-700 mb-0.5">
-              Year <span className="text-red-600">*</span>
-            </label>
-            <input
-              type="number"
-              id="year"
-              className="mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300"
-              placeholder="2020"
-              required
-              value={data.year || ''}
-              onChange={(e) => onUpdate({ year: e.target.value ? parseInt(e.target.value) : null })}
-            />
-          </div>
-          <div>
-            <label htmlFor="rv-type" className="block text-xs font-semibold text-gray-700 mb-0.5">
-              RV Type <span className="text-red-600">*</span>
-            </label>
-            <select
-              id="rv-type"
-              className="mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300"
-              required
-              value={data.rvType}
-              onChange={(e) => onUpdate({ rvType: e.target.value as any, mileage: null })}
-            >
+        {/* RV Type - triggers manufacturer fetch */}
+        <div>
+          <label htmlFor="rv-type" className="block text-xs font-semibold text-gray-700 mb-0.5">
+            RV Type <span className="text-red-600">*</span>
+          </label>
+          <Select value={data.rvType} onValueChange={handleRvTypeChange}>
+            <SelectTrigger id="rv-type" className="mt-0.5">
+              <SelectValue placeholder="Select RV Type" />
+            </SelectTrigger>
+            <SelectContent>
               {RV_TYPE_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
               ))}
-            </select>
-          </div>
+            </SelectContent>
+          </Select>
         </div>
 
+        {/* Manufacturer - from JD Power (depends on RV Type) */}
+        <div>
+          <label htmlFor="manufacturer" className="block text-xs font-semibold text-gray-700 mb-0.5">
+            Manufacturer <span className="text-red-600">*</span>
+          </label>
+          <SearchableCombobox
+            id="manufacturer"
+            label="Manufacturer"
+            placeholder="Select Manufacturer"
+            searchPlaceholder="Search manufacturers..."
+            options={manufacturerOptions}
+            value={data.customManufacturer ? `custom:${data.customManufacturer}` : data.jdPowerManufacturerId?.toString() ?? null}
+            onChange={handleManufacturerChange}
+            isLoading={isLoadingMakes}
+            disabled={!data.rvType}
+            allowCustom={true}
+          />
+        </div>
+
+        {/* Year - from JD Power (depends on Manufacturer) or custom entry */}
+        <div>
+          <label htmlFor="year" className="block text-xs font-semibold text-gray-700 mb-0.5">
+            Year <span className="text-red-600">*</span>
+          </label>
+          <SearchableCombobox
+            id="year"
+            label="Year"
+            placeholder="Select Year"
+            searchPlaceholder="Search years..."
+            options={yearOptions}
+            value={data.year?.toString() ?? null}
+            onChange={handleYearChange}
+            isLoading={isLoadingYears}
+            disabled={!data.jdPowerManufacturerId && !data.customManufacturer}
+            allowCustom={true}
+          />
+        </div>
+
+        {/* Make (ModelSeries from JD Power - depends on Year) */}
         <div>
           <label htmlFor="make" className="block text-xs font-semibold text-gray-700 mb-0.5">
             Make <span className="text-red-600">*</span>
           </label>
-          <select
+          <SearchableCombobox
             id="make"
-            className="mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300"
-            required
-            value={data.make}
-            onChange={(e) => onUpdate({ make: e.target.value })}
-          >
-            <option value="">Select Make</option>
-            {RV_MAKES.map(make => (
-              <option key={make} value={make}>{make}</option>
-            ))}
-          </select>
+            label="Make"
+            placeholder="Select Make"
+            searchPlaceholder="Search makes..."
+            options={makeOptions}
+            value={data.customMake ? `custom:${data.customMake}` : data.make || null}
+            onChange={handleMakeChange}
+            isLoading={isLoadingModels}
+            disabled={!data.year && !data.customManufacturer}
+            allowCustom={true}
+          />
         </div>
 
+        {/* Model (ModelTrimName from JD Power - depends on Make) */}
         <div>
           <label htmlFor="model" className="block text-xs font-semibold text-gray-700 mb-0.5">
             Model/Floorplan <span className="text-red-600">*</span>
           </label>
-          <select
+          <SearchableCombobox
             id="model"
-            className="mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300"
-            required
-            value={data.model}
-            onChange={(e) => onUpdate({ model: e.target.value })}
-          >
-            <option value="">Select Model</option>
-            {RV_MODELS.map(model => (
-              <option key={model} value={model}>{model}</option>
-            ))}
-          </select>
+            label="Model"
+            placeholder="Select Model"
+            searchPlaceholder="Search models..."
+            options={modelOptions}
+            value={data.customModel ? `custom:${data.customModel}` : data.jdPowerModelTrimId?.toString() ?? null}
+            onChange={handleModelChange}
+            disabled={!data.make && !data.customMake}
+            allowCustom={true}
+          />
         </div>
 
-        {/* Mileage field - enabled/disabled by RV type */}
+        {/* Mileage */}
         <div>
           <label htmlFor="mileage" className="block text-xs font-semibold text-gray-700 mb-0.5">
             Mileage / Engine Hours
@@ -232,7 +515,7 @@ export default function Section1UnitData({
             type="number"
             id="mileage"
             className={`mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm transition-all ${
-              isMileageEnabled 
+              isMileageEnabled
                 ? 'bg-white text-gray-900 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 hover:border-blue-300'
                 : 'bg-gray-100 text-gray-500 cursor-not-allowed'
             }`}
@@ -240,20 +523,6 @@ export default function Section1UnitData({
             disabled={!isMileageEnabled}
             value={data.mileage || ''}
             onChange={(e) => onUpdate({ mileage: e.target.value ? parseInt(e.target.value) : null })}
-          />
-        </div>
-
-        <div>
-          <label htmlFor="original-list-price" className="block text-xs font-semibold text-gray-700 mb-0.5">
-            Original List Price
-          </label>
-          <input
-            type="number"
-            id="original-list-price"
-            className="mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300"
-            placeholder="e.g., 85000"
-            value={data.originalListPrice || ''}
-            onChange={(e) => onUpdate({ originalListPrice: e.target.value ? parseInt(e.target.value) : null })}
           />
         </div>
 
@@ -273,19 +542,23 @@ export default function Section1UnitData({
         <button
           type="button"
           onClick={onLookup}
-          disabled={!isLookupReady || isLookupComplete}
+          disabled={!isLookupReady || isLookupComplete || isLoading}
           className={`w-full py-2 mt-2 text-sm text-white font-bold rounded-lg shadow-md transition-all transform ${
-            isLookupReady && !isLookupComplete
+            isLookupReady && !isLookupComplete && !isLoading
               ? 'bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 hover:shadow-2xl hover:scale-[1.02] active:scale-[0.98]'
               : 'bg-gray-400 cursor-not-allowed opacity-60'
           }`}
         >
-          {isLookupComplete ? (
+          {isLoading ? (
             <span className="flex items-center justify-center gap-2">
-              <span className="text-xl">✓</span> Unit Data Loaded
+              <span className="animate-spin">⏳</span> Loading...
+            </span>
+          ) : isLookupComplete ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="text-xl">✓</span> Trade Value Loaded
             </span>
           ) : (
-            'Lookup Unit Data'
+            'Get Trade Value'
           )}
         </button>
       </div>
