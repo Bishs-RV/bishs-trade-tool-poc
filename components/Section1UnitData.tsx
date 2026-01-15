@@ -14,6 +14,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 
 interface Section1Props {
   data: TradeData;
@@ -326,37 +329,37 @@ export default function Section1UnitData({
           </div>
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <label htmlFor="customer-name" className="block text-xs font-semibold text-gray-700 mb-0.5">
+              <Label htmlFor="customer-name" className="text-xs font-semibold text-gray-700">
                 Name
-              </label>
-              <input
+              </Label>
+              <Input
                 type="text"
                 id="customer-name"
-                className="mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300"
+                className="mt-0.5"
                 value={data.customerName}
                 onChange={(e) => onUpdate({ customerName: e.target.value })}
               />
             </div>
             <div>
-              <label htmlFor="customer-phone" className="block text-xs font-semibold text-gray-700 mb-0.5">
+              <Label htmlFor="customer-phone" className="text-xs font-semibold text-gray-700">
                 Phone
-              </label>
-              <input
+              </Label>
+              <Input
                 type="tel"
                 id="customer-phone"
-                className="mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300"
+                className="mt-0.5"
                 value={data.customerPhone}
                 onChange={(e) => onUpdate({ customerPhone: e.target.value })}
               />
             </div>
             <div>
-              <label htmlFor="customer-email" className="block text-xs font-semibold text-gray-700 mb-0.5">
+              <Label htmlFor="customer-email" className="text-xs font-semibold text-gray-700">
                 Email
-              </label>
-              <input
+              </Label>
+              <Input
                 type="email"
                 id="customer-email"
-                className="mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300"
+                className="mt-0.5"
                 value={data.customerEmail}
                 onChange={(e) => onUpdate({ customerEmail: e.target.value })}
               />
@@ -367,27 +370,27 @@ export default function Section1UnitData({
         {/* Stock Number and VIN */}
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label htmlFor="stock-number" className="block text-xs font-semibold text-gray-700 mb-0.5">
+            <Label htmlFor="stock-number" className="text-xs font-semibold text-gray-700">
               Stock Number
-            </label>
-            <input
+            </Label>
+            <Input
               type="text"
               id="stock-number"
-              className="mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300 font-mono"
+              className="mt-0.5 font-mono"
               placeholder="Enter Stock Number"
               value={data.stockNumber}
               onChange={(e) => onUpdate({ stockNumber: e.target.value })}
             />
           </div>
           <div>
-            <label htmlFor="vin" className="block text-xs font-semibold text-gray-700 mb-0.5">
+            <Label htmlFor="vin" className="text-xs font-semibold text-gray-700">
               VIN
-            </label>
-            <input
+            </Label>
+            <Input
               type="text"
               id="vin"
               maxLength={17}
-              className="mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300 font-mono"
+              className="mt-0.5 font-mono"
               placeholder="17-Digit VIN"
               value={data.vin}
               onChange={(e) => onUpdate({ vin: e.target.value.toUpperCase() })}
@@ -397,28 +400,26 @@ export default function Section1UnitData({
 
         {/* Location */}
         <div>
-          <label htmlFor="location" className="block text-xs font-semibold text-gray-700 mb-0.5">
+          <Label htmlFor="location" className="text-xs font-semibold text-gray-700">
             Location <span className="text-red-600">*</span>
-          </label>
-          <select
-            id="location"
-            className="mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-blue-300"
-            required
-            value={data.location}
-            onChange={(e) => onUpdate({ location: e.target.value })}
-          >
-            <option value="" disabled>Select Store</option>
-            {LOCATIONS.map(loc => (
-              <option key={loc} value={loc}>{loc}</option>
-            ))}
-          </select>
+          </Label>
+          <Select value={data.location} onValueChange={(value) => onUpdate({ location: value })}>
+            <SelectTrigger id="location" className="mt-0.5">
+              <SelectValue placeholder="Select Store" />
+            </SelectTrigger>
+            <SelectContent>
+              {LOCATIONS.map(loc => (
+                <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* RV Type - triggers manufacturer fetch */}
         <div>
-          <label htmlFor="rv-type" className="block text-xs font-semibold text-gray-700 mb-0.5">
+          <Label htmlFor="rv-type" className="text-xs font-semibold text-gray-700">
             RV Type <span className="text-red-600">*</span>
-          </label>
+          </Label>
           <Select value={data.rvType} onValueChange={handleRvTypeChange}>
             <SelectTrigger id="rv-type" className="mt-0.5">
               <SelectValue placeholder="Select RV Type" />
@@ -433,9 +434,9 @@ export default function Section1UnitData({
 
         {/* Manufacturer - from JD Power (depends on RV Type) */}
         <div>
-          <label htmlFor="manufacturer" className="block text-xs font-semibold text-gray-700 mb-0.5">
+          <Label htmlFor="manufacturer" className="text-xs font-semibold text-gray-700">
             Manufacturer <span className="text-red-600">*</span>
-          </label>
+          </Label>
           <SearchableCombobox
             id="manufacturer"
             label="Manufacturer"
@@ -452,9 +453,9 @@ export default function Section1UnitData({
 
         {/* Year - from JD Power (depends on Manufacturer) or custom entry */}
         <div>
-          <label htmlFor="year" className="block text-xs font-semibold text-gray-700 mb-0.5">
+          <Label htmlFor="year" className="text-xs font-semibold text-gray-700">
             Year <span className="text-red-600">*</span>
-          </label>
+          </Label>
           <SearchableCombobox
             id="year"
             label="Year"
@@ -471,9 +472,9 @@ export default function Section1UnitData({
 
         {/* Make (ModelSeries from JD Power - depends on Year) */}
         <div>
-          <label htmlFor="make" className="block text-xs font-semibold text-gray-700 mb-0.5">
+          <Label htmlFor="make" className="text-xs font-semibold text-gray-700">
             Make <span className="text-red-600">*</span>
-          </label>
+          </Label>
           <SearchableCombobox
             id="make"
             label="Make"
@@ -490,9 +491,9 @@ export default function Section1UnitData({
 
         {/* Model (ModelTrimName from JD Power - depends on Make) */}
         <div>
-          <label htmlFor="model" className="block text-xs font-semibold text-gray-700 mb-0.5">
+          <Label htmlFor="model" className="text-xs font-semibold text-gray-700">
             Model/Floorplan <span className="text-red-600">*</span>
-          </label>
+          </Label>
           <SearchableCombobox
             id="model"
             label="Model"
@@ -508,17 +509,13 @@ export default function Section1UnitData({
 
         {/* Mileage */}
         <div>
-          <label htmlFor="mileage" className="block text-xs font-semibold text-gray-700 mb-0.5">
+          <Label htmlFor="mileage" className="text-xs font-semibold text-gray-700">
             Mileage / Engine Hours
-          </label>
-          <input
+          </Label>
+          <Input
             type="number"
             id="mileage"
-            className={`mt-0.5 block w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm transition-all ${
-              isMileageEnabled
-                ? 'bg-white text-gray-900 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 hover:border-blue-300'
-                : 'bg-gray-100 text-gray-500 cursor-not-allowed'
-            }`}
+            className="mt-0.5 disabled:bg-gray-100 disabled:text-gray-500"
             placeholder="e.g., 15000"
             disabled={!isMileageEnabled}
             value={data.mileage || ''}
@@ -530,24 +527,20 @@ export default function Section1UnitData({
 
         {/* JD Power Trade-In (Read-Only Reference) */}
         <div className="bg-gradient-to-br from-gray-100 to-slate-200 rounded-lg p-3 text-center shadow-md border border-gray-300">
-          <label className="block text-xs font-bold text-gray-600 mb-1 uppercase tracking-wide">
+          <span className="block text-xs font-bold text-gray-600 uppercase tracking-wide">
             JD Power Trade-In (Reference)
-          </label>
-          <span className="block text-lg font-black text-gray-900">
+          </span>
+          <span className="block text-lg font-black text-gray-900 mt-1">
             {formatCurrency(calculated.jdPowerTradeIn)}
           </span>
         </div>
 
         {/* Lookup Button */}
-        <button
+        <Button
           type="button"
           onClick={onLookup}
           disabled={!isLookupReady || isLookupComplete || isLoading}
-          className={`w-full py-2 mt-2 text-sm text-white font-bold rounded-lg shadow-md transition-all transform ${
-            isLookupReady && !isLookupComplete && !isLoading
-              ? 'bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 hover:shadow-2xl hover:scale-[1.02] active:scale-[0.98]'
-              : 'bg-gray-400 cursor-not-allowed opacity-60'
-          }`}
+          className="w-full mt-2 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]"
         >
           {isLoading ? (
             <span className="flex items-center justify-center gap-2">
@@ -560,7 +553,7 @@ export default function Section1UnitData({
           ) : (
             'Get Trade Value'
           )}
-        </button>
+        </Button>
       </div>
     </div>
   );
