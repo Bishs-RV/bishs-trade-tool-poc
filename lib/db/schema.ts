@@ -58,3 +58,6 @@ export const tradeEvaluations = tradeToolSchema.table(
 
 export type TradeEvaluation = typeof tradeEvaluations.$inferSelect
 export type NewTradeEvaluation = typeof tradeEvaluations.$inferInsert
+
+// Re-export evo tables for comparables feature
+export * from './schema/evo-units'
