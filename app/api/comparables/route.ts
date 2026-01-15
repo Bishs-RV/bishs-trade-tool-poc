@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { evoMajorunit, evoSalesdealdetail, evoSalesdealdetailunits } from '@/lib/db/schema'
-import { and, eq, gte, lte, ilike, sql, isNotNull } from 'drizzle-orm'
+import { and, eq, gte, lte, ilike, sql, or, isNotNull } from 'drizzle-orm'
 import type { ComparablesResponse, HistoricalComparable } from '@/lib/types/comparables'
 
-const UNIT_TYPE_USED = 'U'
-const UNIT_STATUS_AVAILABLE = ''
 const MAX_YEAR_RANGE = 10
 const MAX_RESULTS = 50
 
@@ -35,15 +33,27 @@ function buildFuzzyPattern(input: string): string {
 
 function buildModelPattern(input: string): string {
   const normalized = input.toLowerCase().trim()
-  // Extract alphanumeric parts for flexible matching
-  // "M-19" should match "M-19", "M19", "M 19"
-  const alphaNum = normalized.replace(/[^a-z0-9]/g, '')
-  return `%${alphaNum}%`
+  // Split into segments and find the longest alphanumeric segment
+  // "M-273QBXL" -> ["m", "273qbxl"] -> use "273qbxl"
+  // This handles cases where JD Power has prefixes the DB doesn't
+  const segments = normalized.split(/[^a-z0-9]+/).filter(s => s.length > 0)
+  if (segments.length === 0) {
+    return `%${normalized.replace(/[^a-z0-9]/g, '')}%`
+  }
+  // Use the longest segment (likely the actual model number)
+  const longest = segments.reduce((a, b) => a.length >= b.length ? a : b)
+  return `%${longest}%`
 }
 
 function parseYearSafely(year: string | null): number | null {
   if (!year) return null
   const parsed = parseInt(year, 10)
+  return isNaN(parsed) ? null : parsed
+}
+
+function parseNumericSafely(value: string | null): number | null {
+  if (!value) return null
+  const parsed = parseFloat(value)
   return isNaN(parsed) ? null : parsed
 }
 
@@ -90,7 +100,8 @@ export async function GET(request: NextRequest) {
         year: evoMajorunit.modelYear,
         manufacturer: evoMajorunit.manufacturer,
         location: evoMajorunit.storeLocation,
-        listedPrice: evoMajorunit.webPrice,
+        webPrice: evoMajorunit.webPrice,
+        dsrp: evoMajorunit.dsrp,
         listingDate: evoMajorunit.dateReceived,
         stockNumber: evoMajorunit.stockNumber,
         vin: evoMajorunit.vin,
@@ -102,14 +113,13 @@ export async function GET(request: NextRequest) {
           sql`LOWER(REGEXP_REPLACE(${evoMajorunit.model}, '[^a-zA-Z0-9]', '', 'g')) LIKE ${modelPattern}`,
           gte(evoMajorunit.modelYear, minYear),
           lte(evoMajorunit.modelYear, maxYear),
-          eq(evoMajorunit.newUsed, UNIT_TYPE_USED),
-          eq(evoMajorunit.unitStatus, UNIT_STATUS_AVAILABLE),
-          isNotNull(evoMajorunit.webPrice)
+          or(isNotNull(evoMajorunit.webPrice), isNotNull(evoMajorunit.dsrp))
         )
       )
       .limit(MAX_RESULTS)
 
-    const soldUnitsRaw = await db
+    // Query 1: Sold units from deal details (has soldPrice, daysInStore, soldDate)
+    const soldFromDealsRaw = await db
       .select({
         id: evoSalesdealdetailunits.dealUnitId,
         make: evoSalesdealdetailunits.make,
@@ -122,7 +132,7 @@ export async function GET(request: NextRequest) {
         stockNumber: evoSalesdealdetailunits.stocknumber,
         vin: evoSalesdealdetailunits.vin,
         salesDealId: evoSalesdealdetailunits.salesDealId,
-        dealerId: evoSalesdealdetailunits.dealerId,
+        cmfId: evoSalesdealdetail.cmfId,
         soldDate: evoSalesdealdetail.deliveryDate,
       })
       .from(evoSalesdealdetailunits)
@@ -136,37 +146,39 @@ export async function GET(request: NextRequest) {
           sql`LOWER(REGEXP_REPLACE(${evoSalesdealdetailunits.model}, '[^a-zA-Z0-9]', '', 'g')) LIKE ${modelPattern}`,
           gte(sql`CAST(${evoSalesdealdetailunits.year} AS INTEGER)`, minYear),
           lte(sql`CAST(${evoSalesdealdetailunits.year} AS INTEGER)`, maxYear),
-          eq(evoSalesdealdetailunits.newused, UNIT_TYPE_USED),
           isNotNull(evoSalesdealdetailunits.unitSoldPrice)
         )
       )
       .limit(MAX_RESULTS)
 
-    const listedUnits: HistoricalComparable[] = listedUnitsRaw.map(unit => ({
-      id: String(unit.id),
-      make: unit.make,
-      model: unit.model,
-      year: unit.year,
-      manufacturer: unit.manufacturer,
-      location: unit.location,
-      listedPrice: unit.listedPrice ? parseFloat(unit.listedPrice) : null,
-      soldPrice: null,
-      soldDate: null,
-      listingDate: unit.listingDate,
-      daysToSale: null,
-      stockNumber: unit.stockNumber,
-      vin: unit.vin,
-    }))
+    const listedUnits: HistoricalComparable[] = listedUnitsRaw.map(unit => {
+      const price = parseNumericSafely(unit.webPrice) ?? parseNumericSafely(unit.dsrp)
+      return {
+        id: String(unit.id),
+        make: unit.make,
+        model: unit.model,
+        year: unit.year,
+        manufacturer: unit.manufacturer,
+        location: unit.location,
+        listedPrice: price,
+        soldPrice: null,
+        soldDate: null,
+        listingDate: unit.listingDate,
+        daysToSale: null,
+        stockNumber: unit.stockNumber,
+        vin: unit.vin,
+      }
+    })
 
-    const soldUnits: HistoricalComparable[] = soldUnitsRaw.map(unit => ({
+    const soldUnits: HistoricalComparable[] = soldFromDealsRaw.map(unit => ({
       id: String(unit.id),
       make: unit.make,
       model: unit.model,
       year: parseYearSafely(unit.year),
       manufacturer: unit.manufacturer,
-      location: unit.dealerId,
+      location: unit.cmfId,
       listedPrice: null,
-      soldPrice: unit.soldPrice ? parseFloat(unit.soldPrice) : null,
+      soldPrice: parseNumericSafely(unit.soldPrice),
       soldDate: unit.soldDate,
       listingDate: unit.listingDate,
       daysToSale: unit.daysInStore,

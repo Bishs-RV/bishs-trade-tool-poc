@@ -78,7 +78,8 @@ export default function Section3Market({
     if (metrics.avgListedPrice !== null) {
       onUpdate({ avgListingPrice: metrics.avgListedPrice })
     }
-  }, [metrics.avgListedPrice, onUpdate])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [metrics.avgListedPrice])
 
   const generateRVTraderLink = () => {
     const params = new URLSearchParams()
