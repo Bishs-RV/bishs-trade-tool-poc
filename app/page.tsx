@@ -7,6 +7,8 @@ import Section1UnitData from '@/components/Section1UnitData';
 import Section2Condition from '@/components/Section2Condition';
 import Section3Market from '@/components/Section3Market';
 import Section4Valuation from '@/components/Section4Valuation';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
 
 export default function Home() {
   const [isLookupComplete, setIsLookupComplete] = useState(false);
@@ -389,19 +391,19 @@ export default function Home() {
           {/* Notes + Submit Row */}
           <div className="flex-shrink-0 flex gap-2">
             <div className="flex-1 p-2 bg-white rounded-lg shadow-md border border-gray-200">
-              <textarea
+              <Textarea
                 id="valuation-notes"
                 rows={2}
-                className="w-full rounded-md border border-gray-200 shadow-sm p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 hover:border-blue-300 disabled:bg-gray-50 disabled:cursor-not-allowed resize-none"
+                className="resize-none"
                 placeholder="Valuation notes: negotiations, sign-off, special terms..."
                 value={data.valuationNotes}
                 onChange={(e) => setData({ ...data, valuationNotes: e.target.value })}
                 disabled={!isLookupComplete}
               />
             </div>
-            <button
+            <Button
               type="submit"
-              className="px-8 py-3 text-lg text-white font-bold rounded-lg shadow-lg bg-gradient-to-r from-slate-600 via-slate-700 to-slate-800 hover:from-slate-700 hover:via-slate-800 hover:to-slate-900 hover:scale-[1.02] active:scale-[0.98] border border-slate-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex-shrink-0"
+              className="px-8 py-3 text-lg text-white font-bold rounded-lg shadow-lg bg-gradient-to-r from-slate-600 via-slate-700 to-slate-800 hover:from-slate-700 hover:via-slate-800 hover:to-slate-900 hover:scale-[1.02] active:scale-[0.98] border border-slate-500 disabled:hover:scale-100 flex-shrink-0"
               disabled={!isLookupComplete || isSubmitting}
             >
               {isSubmitting ? (
@@ -415,7 +417,7 @@ export default function Home() {
                   <span className="text-xl">→</span>
                 </span>
               )}
-            </button>
+            </Button>
           </div>
         </form>
       </div>
