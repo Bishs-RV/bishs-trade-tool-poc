@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import PriorEvaluationsDialog from '@/components/PriorEvaluationsDialog';
+import CustomerInfoFields from '@/components/CustomerInfoFields';
 
 interface Section1Props {
   data: TradeData;
@@ -85,7 +86,6 @@ export default function Section1UnitData({
     [filteredModels]
   );
 
-  // Fetch manufacturers when RV type changes
   useEffect(() => {
     if (!data.rvType) {
       setManufacturers([]);
@@ -93,35 +93,28 @@ export default function Section1UnitData({
     }
 
     const abortController = new AbortController();
+    setIsLoadingMakes(true);
 
-    const fetchMakes = async () => {
-      setIsLoadingMakes(true);
+    (async () => {
       try {
         const categoryId = getCategoryId(data.rvType);
-        // Fetch manufacturers for current year (no year filter needed)
         const response = await fetch(
           `/api/jdpower/makes?rvCategoryId=${categoryId}`,
           { signal: abortController.signal }
         );
         if (!response.ok) throw new Error('Failed to fetch manufacturers');
         const result = await response.json();
-        if (!abortController.signal.aborted) {
-          setManufacturers(result.makes || []);
-        }
+        setManufacturers(result.makes || []);
       } catch (error) {
         if (!abortController.signal.aborted) {
           console.error('Error fetching manufacturers:', error);
           setManufacturers([]);
         }
       } finally {
-        if (!abortController.signal.aborted) {
-          setIsLoadingMakes(false);
-        }
+        setIsLoadingMakes(false);
       }
-    };
+    })();
 
-    fetchMakes();
-    // Reset downstream selections when RV type changes
     setYears([]);
     setModelTrims([]);
     onUpdateRef.current({
@@ -136,7 +129,6 @@ export default function Section1UnitData({
     return () => abortController.abort();
   }, [data.rvType]);
 
-  // Fetch years when manufacturer changes
   useEffect(() => {
     if (!data.jdPowerManufacturerId) {
       setYears([]);
@@ -144,9 +136,9 @@ export default function Section1UnitData({
     }
 
     const abortController = new AbortController();
+    setIsLoadingYears(true);
 
-    const fetchYearsData = async () => {
-      setIsLoadingYears(true);
+    (async () => {
       try {
         const response = await fetch(
           `/api/jdpower/years?makeId=${data.jdPowerManufacturerId}`,
@@ -154,23 +146,17 @@ export default function Section1UnitData({
         );
         if (!response.ok) throw new Error('Failed to fetch years');
         const result = await response.json();
-        if (!abortController.signal.aborted) {
-          setYears(result.years || []);
-        }
+        setYears(result.years || []);
       } catch (error) {
         if (!abortController.signal.aborted) {
           console.error('Error fetching years:', error);
           setYears([]);
         }
       } finally {
-        if (!abortController.signal.aborted) {
-          setIsLoadingYears(false);
-        }
+        setIsLoadingYears(false);
       }
-    };
+    })();
 
-    fetchYearsData();
-    // Reset downstream selections when manufacturer changes
     setModelTrims([]);
     onUpdateRef.current({
       year: null,
@@ -182,7 +168,6 @@ export default function Section1UnitData({
     return () => abortController.abort();
   }, [data.jdPowerManufacturerId]);
 
-  // Fetch model trims when year changes (manufacturer already selected)
   useEffect(() => {
     if (!data.year || !data.rvType || !data.jdPowerManufacturerId) {
       setModelTrims([]);
@@ -190,9 +175,15 @@ export default function Section1UnitData({
     }
 
     const abortController = new AbortController();
+    setIsLoadingModels(true);
+    setModelTrims([]);
+    onUpdateRef.current({
+      make: '',
+      model: '',
+      jdPowerModelTrimId: null,
+    });
 
-    const fetchModels = async () => {
-      setIsLoadingModels(true);
+    (async () => {
       try {
         const categoryId = getCategoryId(data.rvType);
         const response = await fetch(
@@ -201,60 +192,38 @@ export default function Section1UnitData({
         );
         if (!response.ok) throw new Error('Failed to fetch models');
         const result = await response.json();
-        if (!abortController.signal.aborted) {
-          setModelTrims(result.modelTrims || []);
-        }
+        setModelTrims(result.modelTrims || []);
       } catch (error) {
         if (!abortController.signal.aborted) {
           console.error('Error fetching models:', error);
           setModelTrims([]);
         }
       } finally {
-        if (!abortController.signal.aborted) {
-          setIsLoadingModels(false);
-        }
+        setIsLoadingModels(false);
       }
-    };
-
-    // Reset make/model selections when year changes (before fetch to avoid race condition)
-    setModelTrims([]);
-    onUpdateRef.current({
-      make: '',
-      model: '',
-      jdPowerModelTrimId: null,
-    });
-
-    fetchModels();
+    })();
 
     return () => abortController.abort();
   }, [data.year, data.jdPowerManufacturerId, data.rvType]);
 
-  // Check if we're in custom input mode (any custom values set)
-  const isCustomInputMode =
-    data.customManufacturer !== undefined ||
-    data.customMake !== undefined ||
-    data.customModel !== undefined;
+  const isCustomInputMode = !!(
+    data.customManufacturer ||
+    data.customMake ||
+    data.customModel
+  );
 
-  // For standard JD Power flow, need modelTrimId
-  // For custom input flow, need year, manufacturer name, and model name
-  const isLookupReady = isCustomInputMode
-    ? data.year !== null &&
-      (data.customManufacturer || data.jdPowerManufacturerId !== null) &&
-      data.model.trim() !== '' &&
-      data.rvType !== null
-    : data.year !== null &&
-      data.jdPowerManufacturerId !== null &&
-      data.make.trim() !== '' &&
-      data.model.trim() !== '' &&
-      data.rvType !== null &&
-      data.jdPowerModelTrimId !== null;
+  const isLookupReady =
+    data.year !== null &&
+    data.rvType !== null &&
+    data.model.trim() !== '' &&
+    (isCustomInputMode
+      ? (data.customManufacturer || data.jdPowerManufacturerId !== null)
+      : (data.jdPowerManufacturerId !== null &&
+         data.make.trim() !== '' &&
+         data.jdPowerModelTrimId !== null));
 
   const handleYearChange = (option: ComboboxOption) => {
-    // Handle custom year input (user typed a year not in list)
-    const yearValue = option.isCustom
-      ? parseInt(option.label, 10)
-      : parseInt(option.value, 10);
-
+    const yearValue = parseInt(option.isCustom ? option.label : option.value, 10);
     if (!isNaN(yearValue) && yearValue >= 1980 && yearValue <= 2100) {
       onUpdate({ year: yearValue });
     }
@@ -265,38 +234,24 @@ export default function Section1UnitData({
   };
 
   const handleManufacturerChange = (option: ComboboxOption) => {
-    if (option.isCustom) {
-      // Custom manufacturer - store the label as the manufacturer name
-      onUpdate({
-        jdPowerManufacturerId: null,
-        manufacturerName: option.label,
-        customManufacturer: option.label,
-      });
-    } else {
-      onUpdate({
-        jdPowerManufacturerId: parseInt(option.value, 10),
-        manufacturerName: option.label,
-        customManufacturer: undefined,
-      });
-    }
+    onUpdate(option.isCustom ? {
+      jdPowerManufacturerId: null,
+      manufacturerName: option.label,
+      customManufacturer: option.label,
+    } : {
+      jdPowerManufacturerId: parseInt(option.value, 10),
+      manufacturerName: option.label,
+      customManufacturer: undefined,
+    });
   };
 
   const handleMakeChange = (option: ComboboxOption) => {
-    if (option.isCustom) {
-      onUpdate({
-        make: option.label,
-        customMake: option.label,
-        model: '',
-        jdPowerModelTrimId: null,
-      });
-    } else {
-      onUpdate({
-        make: option.value,
-        customMake: undefined,
-        model: '',
-        jdPowerModelTrimId: null,
-      });
-    }
+    onUpdate({
+      make: option.isCustom ? option.label : option.value,
+      customMake: option.isCustom ? option.label : undefined,
+      model: '',
+      jdPowerModelTrimId: null,
+    });
   };
 
   const handleModelChange = (option: ComboboxOption) => {
@@ -306,15 +261,16 @@ export default function Section1UnitData({
         customModel: option.label,
         jdPowerModelTrimId: null,
       });
-    } else {
-      const selectedModel = modelTrims.find(m => m.ModelTrimID.toString() === option.value);
-      if (selectedModel) {
-        onUpdate({
-          model: selectedModel.ModelTrimName,
-          customModel: undefined,
-          jdPowerModelTrimId: selectedModel.ModelTrimID,
-        });
-      }
+      return;
+    }
+
+    const selectedModel = modelTrims.find(m => m.ModelTrimID.toString() === option.value);
+    if (selectedModel) {
+      onUpdate({
+        model: selectedModel.ModelTrimName,
+        customModel: undefined,
+        jdPowerModelTrimId: selectedModel.ModelTrimID,
+      });
     }
   };
 
@@ -328,49 +284,12 @@ export default function Section1UnitData({
       </div>
       <div className="space-y-2">
         {/* Customer Info Section */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-xs font-bold text-blue-900 uppercase tracking-wide">Customer Info</h3>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <div>
-              <Label htmlFor="customer-name" className="text-xs font-semibold text-gray-700">
-                Name
-              </Label>
-              <Input
-                type="text"
-                id="customer-name"
-                className="mt-0.5"
-                value={data.customerName}
-                onChange={(e) => onUpdate({ customerName: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label htmlFor="customer-phone" className="text-xs font-semibold text-gray-700">
-                Phone
-              </Label>
-              <Input
-                type="tel"
-                id="customer-phone"
-                className="mt-0.5"
-                value={data.customerPhone}
-                onChange={(e) => onUpdate({ customerPhone: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label htmlFor="customer-email" className="text-xs font-semibold text-gray-700">
-                Email
-              </Label>
-              <Input
-                type="email"
-                id="customer-email"
-                className="mt-0.5"
-                value={data.customerEmail}
-                onChange={(e) => onUpdate({ customerEmail: e.target.value })}
-              />
-            </div>
-          </div>
-        </div>
+        <CustomerInfoFields
+          customerName={data.customerName}
+          customerPhone={data.customerPhone}
+          customerEmail={data.customerEmail}
+          onUpdate={onUpdate}
+        />
 
         {/* Stock Number and VIN */}
         <div className="grid grid-cols-2 gap-2">
