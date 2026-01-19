@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { evoMajorunit, evoSalesdealdetail, evoSalesdealdetailunits } from '@/lib/db/schema'
+import { evoMajorunit, evoSalesdealdetail, evoSalesdealdetailunits, locationDetail } from '@/lib/db/schema'
 import { and, eq, gte, lte, ilike, sql, or, isNotNull } from 'drizzle-orm'
 import type { ComparablesResponse, HistoricalComparable } from '@/lib/types/comparables'
 
@@ -92,6 +92,7 @@ export async function GET(request: NextRequest) {
   try {
     // Use REGEXP_REPLACE to normalize DB values for comparison
     // This allows "M-19" in DB to match pattern "%m19%"
+    // Join to location_detail to get proper location code from Cmf_id
     const listedUnitsRaw = await db
       .select({
         id: evoMajorunit.majorUnitHeaderId,
@@ -99,7 +100,7 @@ export async function GET(request: NextRequest) {
         model: evoMajorunit.model,
         year: evoMajorunit.modelYear,
         manufacturer: evoMajorunit.manufacturer,
-        location: evoMajorunit.storeLocation,
+        location: locationDetail.location,
         webPrice: evoMajorunit.webPrice,
         dsrp: evoMajorunit.dsrp,
         listingDate: evoMajorunit.dateReceived,
@@ -107,6 +108,10 @@ export async function GET(request: NextRequest) {
         vin: evoMajorunit.vin,
       })
       .from(evoMajorunit)
+      .leftJoin(
+        locationDetail,
+        sql`CAST(${evoMajorunit.cmfId} AS INTEGER) = ${locationDetail.cmf}`
+      )
       .where(
         and(
           ilike(evoMajorunit.make, makePattern),
@@ -119,6 +124,7 @@ export async function GET(request: NextRequest) {
       .limit(MAX_RESULTS)
 
     // Query 1: Sold units from deal details (has soldPrice, daysInStore, soldDate)
+    // Join to location_detail to get proper location code from cmfId
     const soldFromDealsRaw = await db
       .select({
         id: evoSalesdealdetailunits.dealUnitId,
@@ -132,13 +138,17 @@ export async function GET(request: NextRequest) {
         stockNumber: evoSalesdealdetailunits.stocknumber,
         vin: evoSalesdealdetailunits.vin,
         salesDealId: evoSalesdealdetailunits.salesDealId,
-        cmfId: evoSalesdealdetail.cmfId,
         soldDate: evoSalesdealdetail.deliveryDate,
+        location: locationDetail.location,
       })
       .from(evoSalesdealdetailunits)
       .innerJoin(
         evoSalesdealdetail,
         eq(evoSalesdealdetailunits.salesDealId, evoSalesdealdetail.dealNoCmf)
+      )
+      .leftJoin(
+        locationDetail,
+        sql`CAST(${evoSalesdealdetail.cmfId} AS INTEGER) = ${locationDetail.cmf}`
       )
       .where(
         and(
@@ -176,7 +186,7 @@ export async function GET(request: NextRequest) {
       model: unit.model,
       year: parseYearSafely(unit.year),
       manufacturer: unit.manufacturer,
-      location: unit.cmfId,
+      location: unit.location,
       listedPrice: null,
       soldPrice: parseNumericSafely(unit.soldPrice),
       soldDate: unit.soldDate,

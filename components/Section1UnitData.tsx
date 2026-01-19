@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { TradeData, CalculatedValues, RVType } from '@/lib/types';
-import { LOCATIONS, RV_TYPE_OPTIONS, isMotorized } from '@/lib/constants';
+import { RV_TYPE_OPTIONS, isMotorized } from '@/lib/constants';
 import { formatCurrency } from '@/lib/calculations';
 import { getCategoryId } from '@/lib/jdpower/rv-types';
 import type { MakeCategory, ModelTrim } from '@/lib/jdpower/types';
@@ -16,6 +16,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import PriorEvaluationsDialog from '@/components/PriorEvaluationsDialog';
+
+interface LocationOption {
+  cmf: number;
+  location: string | null;
+  storename: string | null;
+}
 
 interface Section1Props {
   data: TradeData;
@@ -39,6 +45,10 @@ export default function Section1UnitData({
   const isMileageEnabled = isMotorized(data.rvType);
   const [isPriorEvaluationsOpen, setIsPriorEvaluationsOpen] = useState(false);
 
+  // Location data from API
+  const [locationOptions, setLocationOptions] = useState<LocationOption[]>([]);
+  const [isLoadingLocations, setIsLoadingLocations] = useState(true);
+
   // JD Power cascading data
   const [manufacturers, setManufacturers] = useState<MakeCategory[]>([]);
   const [years, setYears] = useState<number[]>([]);
@@ -50,6 +60,30 @@ export default function Section1UnitData({
   // Use ref to avoid onUpdate in dependency arrays (prevents infinite loops)
   const onUpdateRef = useRef(onUpdate);
   useEffect(() => { onUpdateRef.current = onUpdate; });
+
+  // Fetch locations on mount
+  useEffect(() => {
+    const fetchLocations = async () => {
+      try {
+        const response = await fetch('/api/locations');
+        if (!response.ok) throw new Error('Failed to fetch locations');
+        const result = await response.json();
+        // Filter out locations with null location codes
+        const validLocations = (result.locations || []).filter(
+          (loc: LocationOption) => loc.location !== null
+        );
+        setLocationOptions(validLocations);
+      } catch (error) {
+        console.error('Error fetching locations:', error);
+        // Don't provide invalid fallback data - let user know there's an issue
+        setLocationOptions([]);
+      } finally {
+        setIsLoadingLocations(false);
+      }
+    };
+
+    fetchLocations();
+  }, []);
 
   // Derived data for dropdowns
   const uniqueMakes = Array.from(new Set(modelTrims.map(m => m.ModelSeries))).filter(Boolean).sort();
@@ -427,10 +461,19 @@ export default function Section1UnitData({
             required
             value={data.location}
             onChange={(e) => onUpdate({ location: e.target.value })}
+            disabled={isLoadingLocations}
           >
-            <option value="" disabled>Select Store</option>
-            {LOCATIONS.map(loc => (
-              <option key={loc} value={loc}>{loc}</option>
+            <option value="" disabled>
+              {isLoadingLocations
+                ? 'Loading stores...'
+                : locationOptions.length === 0
+                  ? 'Unable to load stores'
+                  : 'Select Store'}
+            </option>
+            {locationOptions.map(loc => loc.location && (
+              <option key={loc.cmf} value={loc.location}>
+                {loc.storename ? `${loc.location} - ${loc.storename}` : loc.location}
+              </option>
             ))}
           </select>
         </div>
