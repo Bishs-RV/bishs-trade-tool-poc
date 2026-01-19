@@ -6,6 +6,7 @@ import { LOCATIONS, RV_TYPE_OPTIONS, isMotorized } from '@/lib/constants';
 import { formatCurrency } from '@/lib/calculations';
 import { getCategoryId } from '@/lib/jdpower/rv-types';
 import type { MakeCategory, ModelTrim } from '@/lib/jdpower/types';
+import type { TradeEvaluation } from '@/lib/db/schema';
 import { SearchableCombobox, type ComboboxOption } from '@/components/ui/searchable-combobox';
 import {
   Select,
@@ -14,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import PriorEvaluationsDialog from '@/components/PriorEvaluationsDialog';
 
 interface Section1Props {
   data: TradeData;
@@ -22,6 +24,7 @@ interface Section1Props {
   onLookup: () => void;
   isLookupComplete: boolean;
   isLoading?: boolean;
+  onLoadEvaluation?: (evaluation: TradeEvaluation) => void;
 }
 
 export default function Section1UnitData({
@@ -31,8 +34,10 @@ export default function Section1UnitData({
   onLookup,
   isLookupComplete,
   isLoading = false,
+  onLoadEvaluation,
 }: Section1Props) {
   const isMileageEnabled = isMotorized(data.rvType);
+  const [isPriorEvaluationsOpen, setIsPriorEvaluationsOpen] = useState(false);
 
   // JD Power cascading data
   const [manufacturers, setManufacturers] = useState<MakeCategory[]>([]);
@@ -395,6 +400,22 @@ export default function Section1UnitData({
           </div>
         </div>
 
+        {/* Search Prior Evaluations Button */}
+        {onLoadEvaluation && (
+          <button
+            type="button"
+            onClick={() => setIsPriorEvaluationsOpen(true)}
+            disabled={!data.vin && !data.stockNumber}
+            className={`w-full py-1.5 text-xs font-medium rounded-md border transition-colors ${
+              data.vin || data.stockNumber
+                ? 'text-blue-700 border-blue-300 bg-blue-50 hover:bg-blue-100'
+                : 'text-gray-400 border-gray-200 bg-gray-50 cursor-not-allowed'
+            }`}
+          >
+            Search Prior Evaluations
+          </button>
+        )}
+
         {/* Location */}
         <div>
           <label htmlFor="location" className="block text-xs font-semibold text-gray-700 mb-0.5">
@@ -562,6 +583,17 @@ export default function Section1UnitData({
           )}
         </button>
       </div>
+
+      {/* Prior Evaluations Dialog */}
+      {onLoadEvaluation && (
+        <PriorEvaluationsDialog
+          open={isPriorEvaluationsOpen}
+          onOpenChange={setIsPriorEvaluationsOpen}
+          vin={data.vin}
+          stockNumber={data.stockNumber}
+          onLoadEvaluation={onLoadEvaluation}
+        />
+      )}
     </div>
   );
 }

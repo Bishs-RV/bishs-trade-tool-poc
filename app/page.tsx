@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { TradeData, CalculatedValues } from '@/lib/types';
+import { TradeData, CalculatedValues, RVType } from '@/lib/types';
+import type { TradeEvaluation } from '@/lib/db/schema';
 import { calculateValuation, calculateTradeInPercentFromMargin, DriverId, TradeValues } from '@/lib/calculations';
 import Section1UnitData from '@/components/Section1UnitData';
 import Section2Condition from '@/components/Section2Condition';
@@ -303,6 +304,42 @@ export default function Home() {
     }
   };
 
+  const handleLoadEvaluation = (evaluation: TradeEvaluation) => {
+    // Map database fields back to TradeData state
+    const loadedData: Partial<TradeData> = {
+      customerName: evaluation.customerName || '',
+      customerPhone: evaluation.customerPhone || '',
+      customerEmail: evaluation.customerEmail || '',
+      stockNumber: evaluation.stockNumber || '',
+      location: evaluation.location || 'BMT',
+      year: evaluation.year,
+      make: evaluation.make || '',
+      model: evaluation.model || '',
+      vin: evaluation.vin || '',
+      rvType: (evaluation.rvType as RVType) || 'FW',
+      mileage: evaluation.mileage,
+      jdPowerManufacturerId: evaluation.jdPowerManufacturerId,
+      jdPowerModelTrimId: evaluation.jdPowerModelTrimId,
+      conditionScore: evaluation.conditionScore || 8,
+      majorIssues: evaluation.majorIssues || '',
+      unitAddOns: evaluation.unitAddOns || '',
+      additionalPrepCost: evaluation.additionalPrepCost ? parseFloat(evaluation.additionalPrepCost) : 0,
+      avgListingPrice: evaluation.avgListingPrice ? parseFloat(evaluation.avgListingPrice) : 0,
+      tradeInPercent: evaluation.tradeInPercent ? parseFloat(evaluation.tradeInPercent) : 1.0,
+      targetMarginPercent: evaluation.targetMarginPercent ? parseFloat(evaluation.targetMarginPercent) : 0.25,
+      retailPriceSource: (evaluation.retailPriceSource as 'jdpower' | 'custom') || 'jdpower',
+      customRetailValue: evaluation.customRetailValue ? parseFloat(evaluation.customRetailValue) : 0,
+      valuationNotes: evaluation.valuationNotes || '',
+    };
+
+    setData(prev => ({ ...prev, ...loadedData }));
+    // Reset lookup state - user must re-lookup for fresh API values
+    setIsLookupComplete(false);
+    setTradeValues(undefined);
+    // Trigger recalculation
+    recalculate('initial-load', loadedData);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-100 via-blue-50 to-gray-100 p-4 sm:p-8">
       <div className="max-w-screen-2xl mx-auto">
@@ -338,6 +375,7 @@ export default function Home() {
                 onLookup={handleLookup}
                 isLookupComplete={isLookupComplete}
                 isLoading={isLoading}
+                onLoadEvaluation={handleLoadEvaluation}
               />
             </div>
 

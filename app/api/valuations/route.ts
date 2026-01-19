@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { tradeEvaluations } from '@/lib/db/schema'
 import { z } from 'zod'
+import { or, ilike, desc } from 'drizzle-orm'
 
 const createValuationSchema = z.object({
   // Customer Info
@@ -112,6 +113,58 @@ export async function POST(request: NextRequest) {
     console.error('Error saving valuation:', error)
     return NextResponse.json(
       { error: 'Failed to save valuation' },
+      { status: 500 }
+    )
+  }
+}
+
+const searchSchema = z.object({
+  vin: z.string().max(17).optional(),
+  stockNumber: z.string().max(50).optional(),
+}).refine(data => data.vin || data.stockNumber, {
+  message: 'Either vin or stockNumber is required',
+})
+
+const escapeWildcards = (str: string) => str.replace(/[%_\\]/g, '\\$&')
+
+export async function GET(request: NextRequest) {
+  try {
+    const searchParams = request.nextUrl.searchParams
+    const result = searchSchema.safeParse({
+      vin: searchParams.get('vin') || undefined,
+      stockNumber: searchParams.get('stockNumber') || undefined,
+    })
+
+    if (!result.success) {
+      return NextResponse.json(
+        { error: result.error.issues[0]?.message || 'Invalid search parameters' },
+        { status: 400 }
+      )
+    }
+
+    const { vin, stockNumber } = result.data
+
+    // Build where conditions with escaped wildcards
+    const conditions = []
+    if (vin) {
+      conditions.push(ilike(tradeEvaluations.vin, `%${escapeWildcards(vin)}%`))
+    }
+    if (stockNumber) {
+      conditions.push(ilike(tradeEvaluations.stockNumber, `%${escapeWildcards(stockNumber)}%`))
+    }
+
+    const evaluations = await db
+      .select()
+      .from(tradeEvaluations)
+      .where(or(...conditions))
+      .orderBy(desc(tradeEvaluations.createdDate))
+      .limit(10)
+
+    return NextResponse.json({ evaluations })
+  } catch (error: unknown) {
+    console.error('Error fetching valuations:', error)
+    return NextResponse.json(
+      { error: 'Failed to fetch valuations' },
       { status: 500 }
     )
   }
