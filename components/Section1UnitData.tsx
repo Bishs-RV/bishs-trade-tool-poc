@@ -20,6 +20,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import PriorEvaluationsDialog from '@/components/PriorEvaluationsDialog';
 import CustomerInfoFields from '@/components/CustomerInfoFields';
+import StockVinFields from '@/components/StockVinFields';
 
 interface Section1Props {
   data: TradeData;
@@ -292,35 +293,11 @@ export default function Section1UnitData({
         />
 
         {/* Stock Number and VIN */}
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <Label htmlFor="stock-number" className="text-xs font-semibold text-gray-700">
-              Stock Number
-            </Label>
-            <Input
-              type="text"
-              id="stock-number"
-              className="mt-0.5 font-mono"
-              placeholder="Enter Stock Number"
-              value={data.stockNumber}
-              onChange={(e) => onUpdate({ stockNumber: e.target.value })}
-            />
-          </div>
-          <div>
-            <Label htmlFor="vin" className="text-xs font-semibold text-gray-700">
-              VIN
-            </Label>
-            <Input
-              type="text"
-              id="vin"
-              maxLength={17}
-              className="mt-0.5 font-mono"
-              placeholder="17-Digit VIN"
-              value={data.vin}
-              onChange={(e) => onUpdate({ vin: e.target.value.toUpperCase() })}
-            />
-          </div>
-        </div>
+        <StockVinFields
+          stockNumber={data.stockNumber}
+          vin={data.vin}
+          onUpdate={onUpdate}
+        />
 
         {/* Search Prior Evaluations Button */}
         {onLoadEvaluation && (
