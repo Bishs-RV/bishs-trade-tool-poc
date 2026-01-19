@@ -66,7 +66,7 @@ export const TRADE_IN_PERCENT_MIN = 0.70;
 export const TRADE_IN_PERCENT_MAX = 1.30;
 export const MARGIN_PERCENT_MIN = 0;
 export const MARGIN_PERCENT_MAX = 0.40;
-export const TARGET_MARGIN_PERCENT = 0.18;
+export const TARGET_MARGIN_PERCENT = 0.30;
 
 // Location options
 export const LOCATIONS = [

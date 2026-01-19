@@ -61,3 +61,6 @@ export type NewTradeEvaluation = typeof tradeEvaluations.$inferInsert
 
 // Re-export evo tables for comparables feature
 export * from './schema/evo-units'
+
+// Re-export location detail table
+export * from './schema/location-detail'

@@ -2,7 +2,7 @@
 
 import { TradeData, CalculatedValues } from '@/lib/types';
 import { formatCurrency, formatPercent } from '@/lib/calculations';
-import { TARGET_MARGIN_PERCENT } from '@/lib/constants';
+import { TARGET_MARGIN_PERCENT, MARGIN_PERCENT_MAX } from '@/lib/constants';
 
 interface Section4Props {
   data: TradeData;
@@ -82,17 +82,18 @@ export default function Section4Valuation({
             {/* Target tick mark and label */}
             <div className="relative pt-3">
               <div
-                className="absolute top-0 left-0 right-0 flex justify-start pointer-events-none"
-                style={{ paddingLeft: `${(TARGET_MARGIN_PERCENT / 0.40) * 100}%` }}
+                className="absolute top-0 pointer-events-none"
+                style={{
+                  left: `${(TARGET_MARGIN_PERCENT / MARGIN_PERCENT_MAX) * 100}%`,
+                  transform: 'translateX(-50%)'
+                }}
               >
-                <div className="relative" style={{ marginLeft: '-28px' }}>
-                  <span className="block text-xs font-bold text-green-600 whitespace-nowrap mb-0.5">
-                    18% Target
-                  </span>
-                  <div className="w-0.5 h-3 bg-green-600 mx-auto"></div>
-                </div>
+                <span className="block text-xs font-bold text-green-600 whitespace-nowrap mb-0.5 text-center">
+                  {formatPercent(TARGET_MARGIN_PERCENT)} Target
+                </span>
+                <div className="w-0.5 h-3 bg-green-600 mx-auto"></div>
               </div>
-              
+
               <input
                 type="range"
                 id="margin-percent-slider"

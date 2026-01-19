@@ -28,6 +28,7 @@ export const evoMajorunit = pgTable(
     manufacturer: varchar('Manufacturer', { length: 255 }),
     location: varchar('Location', { length: 255 }),
     storeLocation: varchar('StoreLocation', { length: 255 }),
+    cmfId: varchar('Cmf_id', { length: 255 }),
     webPrice: numeric('WebPrice', { precision: 19, scale: 2 }),
     dsrp: numeric('DSRP', { precision: 19, scale: 2 }),
     dateReceived: timestamp('DateReceived', { withTimezone: true, mode: 'string' }),
