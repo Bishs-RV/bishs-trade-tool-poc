@@ -3,13 +3,18 @@
 import { RVType } from '@/lib/types';
 import { LOCATIONS, RV_TYPE_OPTIONS } from '@/lib/constants';
 import { Field, FieldLabel } from '@/components/ui/field';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { SearchableCombobox, type ComboboxOption } from '@/components/ui/searchable-combobox';
+
+// Static options - derived from constants, no need for useMemo
+const locationOptions: ComboboxOption[] = LOCATIONS.map((loc) => ({
+  value: loc,
+  label: loc,
+}));
+
+const rvTypeOptions: ComboboxOption[] = RV_TYPE_OPTIONS.map((opt) => ({
+  value: opt.value,
+  label: opt.label,
+}));
 
 interface LocationRvTypeSelectorProps {
   location: string;
@@ -26,6 +31,7 @@ export default function LocationRvTypeSelector({
   onLocationChange,
   onRvTypeChange,
 }: LocationRvTypeSelectorProps) {
+
   return (
     <>
       {/* Location */}
@@ -33,18 +39,14 @@ export default function LocationRvTypeSelector({
         <FieldLabel className={labelClass}>
           Location <span className="text-red-600">*</span>
         </FieldLabel>
-        <Select value={location} onValueChange={onLocationChange}>
-          <SelectTrigger className="mt-0.5">
-            <SelectValue placeholder="Select Store" />
-          </SelectTrigger>
-          <SelectContent>
-            {LOCATIONS.map((loc) => (
-              <SelectItem key={loc} value={loc}>
-                {loc}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchableCombobox
+          label="Location"
+          placeholder="Select Store"
+          searchPlaceholder="Search locations..."
+          options={locationOptions}
+          value={location || null}
+          onChange={(option) => onLocationChange(option.value)}
+        />
       </Field>
 
       {/* RV Type */}
@@ -52,18 +54,14 @@ export default function LocationRvTypeSelector({
         <FieldLabel className={labelClass}>
           RV Type <span className="text-red-600">*</span>
         </FieldLabel>
-        <Select value={rvType} onValueChange={(value) => onRvTypeChange(value as RVType)}>
-          <SelectTrigger className="mt-0.5">
-            <SelectValue placeholder="Select RV Type" />
-          </SelectTrigger>
-          <SelectContent>
-            {RV_TYPE_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchableCombobox
+          label="RV Type"
+          placeholder="Select RV Type"
+          searchPlaceholder="Search RV types..."
+          options={rvTypeOptions}
+          value={rvType || null}
+          onChange={(option) => onRvTypeChange(option.value as RVType)}
+        />
       </Field>
     </>
   );
