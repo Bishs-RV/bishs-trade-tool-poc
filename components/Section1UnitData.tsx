@@ -60,8 +60,8 @@ export default function Section1UnitData({
         </div>
         <h2 className="text-lg font-bold text-gray-900">Unit & Base Data</h2>
       </div>
-      <div className="space-y-2">
-        {/* Customer Info Section */}
+      <div className="space-y-3">
+        {/* Customer Info */}
         <CustomerInfoFields
           customerName={data.customerName}
           customerPhone={data.customerPhone}
@@ -69,68 +69,69 @@ export default function Section1UnitData({
           onUpdate={onUpdate}
         />
 
-        {/* Stock Number and VIN */}
-        <StockVinFields
-          stockNumber={data.stockNumber}
-          vin={data.vin}
-          onUpdate={onUpdate}
-        />
-
-        {/* Search Prior Evaluations Button */}
-        {onLoadEvaluation && (
-          <Button
-            type="button"
-            variant="primary"
-            onClick={() => setIsPriorEvaluationsOpen(true)}
-            disabled={!data.vin && !data.stockNumber}
-            className="w-full"
-          >
-            {!data.vin && !data.stockNumber ? (
-              <span className="text-gray-300">Enter VIN or Stock # to search</span>
-            ) : (
-              'Search Prior Evaluations'
-            )}
-          </Button>
-        )}
-
-        {/* Location and RV Type */}
-        <LocationRvTypeSelector
-          location={data.location}
-          rvType={data.rvType}
-          onLocationChange={(location) => onUpdate({ location })}
-          onRvTypeChange={handleRvTypeChange}
-        />
-
-        {/* JD Power Cascading Lookup (Manufacturer → Year → Make → Model) */}
-        <JDPowerCascadingLookup
-          rvType={data.rvType}
-          jdPowerManufacturerId={data.jdPowerManufacturerId}
-          customManufacturer={data.customManufacturer}
-          year={data.year}
-          make={data.make}
-          customMake={data.customMake}
-          customModel={data.customModel}
-          jdPowerModelTrimId={data.jdPowerModelTrimId}
-          onUpdate={onUpdate}
-        />
-
-        {/* Mileage */}
-        <div>
-          <Label htmlFor="mileage" className="text-xs font-semibold text-gray-700">
-            Mileage / Engine Hours
-          </Label>
-          <Input
-            type="number"
-            id="mileage"
-            className="mt-0.5 disabled:bg-gray-100 disabled:text-gray-500"
-            placeholder="e.g., 15000"
-            disabled={!isMileageEnabled}
-            value={data.mileage !== null ? data.mileage : ''}
-            onChange={(e) => onUpdate({ mileage: e.target.value ? parseInt(e.target.value, 10) : null })}
+        {/* Stock/VIN & Search Prior Evaluations Card */}
+        <div className="p-3 bg-gradient-to-br from-gray-50 to-slate-50 rounded-lg border border-gray-300 space-y-2">
+          <StockVinFields
+            stockNumber={data.stockNumber}
+            vin={data.vin}
+            onUpdate={onUpdate}
           />
+          {onLoadEvaluation && (
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => setIsPriorEvaluationsOpen(true)}
+              disabled={!data.vin && !data.stockNumber}
+              className="w-full"
+            >
+              {!data.vin && !data.stockNumber ? (
+                <span className="text-gray-300">Enter VIN or Stock # to search</span>
+              ) : (
+                'Search Prior Evaluations'
+              )}
+            </Button>
+          )}
         </div>
 
-        {/* Trade Value Display and Lookup Button */}
+        {/* JD Power Lookup Card */}
+        <div className="p-3 bg-gradient-to-br from-gray-50 to-slate-50 rounded-lg border border-gray-300 space-y-2">
+          <LocationRvTypeSelector
+            location={data.location}
+            rvType={data.rvType}
+            onLocationChange={(location) => onUpdate({ location })}
+            onRvTypeChange={handleRvTypeChange}
+          />
+          <JDPowerCascadingLookup
+            rvType={data.rvType}
+            jdPowerManufacturerId={data.jdPowerManufacturerId}
+            customManufacturer={data.customManufacturer}
+            year={data.year}
+            make={data.make}
+            customMake={data.customMake}
+            customModel={data.customModel}
+            jdPowerModelTrimId={data.jdPowerModelTrimId}
+            onUpdate={onUpdate}
+          />
+          <div>
+            <Label htmlFor="mileage" className="text-xs font-semibold text-gray-700">
+              Mileage / Engine Hours
+            </Label>
+            <Input
+              type="number"
+              id="mileage"
+              className="mt-0.5 disabled:bg-gray-100 disabled:text-gray-500"
+              placeholder="e.g., 15000"
+              disabled={!isMileageEnabled}
+              value={data.mileage !== null ? data.mileage : ''}
+              onChange={(e) => {
+              const parsed = parseInt(e.target.value, 10);
+              onUpdate({ mileage: isNaN(parsed) ? null : parsed });
+            }}
+            />
+          </div>
+        </div>
+
+        {/* Trade Value Reference & CTA */}
         <TradeValueCard
           jdPowerTradeIn={calculated.jdPowerTradeIn}
           isLookupReady={isLookupReady}

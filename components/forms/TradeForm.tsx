@@ -14,7 +14,12 @@ import Section1UnitData from '@/components/Section1UnitData';
 import Section2Condition from '@/components/Section2Condition';
 import Section3Market from '@/components/Section3Market';
 import Section4Valuation from '@/components/Section4Valuation';
+import StickyActionBar from '@/components/StickyActionBar';
 import { Textarea } from '@/components/ui/textarea';
+
+const VALID_RV_TYPES = ['TT', 'FW', 'POP', 'TC', 'CAG', 'CAD', 'CCG', 'CCD'] as const;
+const isValidRvType = (type: string | null): type is RVType =>
+  type !== null && VALID_RV_TYPES.includes(type as RVType);
 
 const initialData: TradeData = {
   customerName: '',
@@ -292,7 +297,7 @@ export default function TradeForm() {
       make: evaluation.make || '',
       model: evaluation.model || '',
       vin: evaluation.vin || '',
-      rvType: (evaluation.rvType as RVType) || 'FW',
+      rvType: isValidRvType(evaluation.rvType) ? evaluation.rvType : 'FW',
       mileage: evaluation.mileage,
       jdPowerManufacturerId: evaluation.jdPowerManufacturerId,
       jdPowerModelTrimId: evaluation.jdPowerModelTrimId,
@@ -407,9 +412,14 @@ export default function TradeForm() {
             handleUpdate(updates, driverId);
           }}
           isLocked={!isLookupComplete}
-          isSubmitting={isSubmitting}
         />
       </div>
+
+      {/* Sticky Action Bar */}
+      <StickyActionBar
+        isLocked={!isLookupComplete}
+        isSubmitting={isSubmitting}
+      />
     </form>
   );
 }

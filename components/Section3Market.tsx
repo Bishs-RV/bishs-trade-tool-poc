@@ -90,7 +90,7 @@ export default function Section3Market({
   }
 
   return (
-    <div className="relative">
+    <div className="relative h-full">
       <div className={`bg-white p-4 rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 h-full ${isLocked ? 'pointer-events-none select-none' : ''}`}>
 
       {isLocked && (

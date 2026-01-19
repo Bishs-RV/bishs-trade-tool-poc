@@ -56,7 +56,7 @@ export default function ValuationSliders({
             {/* Target tick mark positioned above slider */}
             <div
               className="absolute bottom-full mb-1 pointer-events-none"
-              style={{ left: '74%', transform: 'translateX(-50%)' }}
+              style={{ left: '75%', transform: 'translateX(-50%)' }}
             >
               <span className="block text-xs font-bold text-green-600 whitespace-nowrap text-center">
                 {formatPercent(TARGET_MARGIN_PERCENT)} Target

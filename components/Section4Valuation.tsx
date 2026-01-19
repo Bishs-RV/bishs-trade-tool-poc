@@ -1,7 +1,6 @@
 'use client';
 
 import { TradeData, CalculatedValues } from '@/lib/types';
-import { Button } from '@/components/ui/button';
 import ValuationSliders from '@/components/ValuationSliders';
 import FinancialMetricsGrid from '@/components/FinancialMetricsGrid';
 
@@ -10,7 +9,6 @@ interface Section4Props {
   calculated: CalculatedValues;
   onUpdate: (updates: Partial<TradeData>) => void;
   isLocked: boolean;
-  isSubmitting: boolean;
 }
 
 export default function Section4Valuation({
@@ -18,7 +16,6 @@ export default function Section4Valuation({
   calculated,
   onUpdate,
   isLocked,
-  isSubmitting,
 }: Section4Props) {
   return (
     <div className="relative">
@@ -60,35 +57,6 @@ export default function Section4Valuation({
           calculatedMarginPercent={calculated.calculatedMarginPercent}
           onUpdate={onUpdate}
         />
-
-        {/* Action Buttons */}
-        <div className="pt-3 flex justify-end gap-2">
-          <Button
-            type="button"
-            onClick={() => window.print()}
-            className="px-4 py-2 text-xs text-white font-bold shadow-md bg-slate-700 hover:bg-slate-800 hover:scale-105 active:scale-95 border border-slate-600 flex items-center gap-2"
-          >
-            <span>PDF PRINTOUT</span>
-          </Button>
-          <Button
-            type="submit"
-            variant="primary"
-            size="lg"
-            disabled={isLocked || isSubmitting}
-          >
-            {isSubmitting ? (
-              <span className="flex items-center gap-2">
-                <span className="animate-spin">⏳</span>
-                <span>SAVING...</span>
-              </span>
-            ) : (
-              <span className="flex items-center gap-2">
-                <span>SUBMIT</span>
-                <span className="text-xl">→</span>
-              </span>
-            )}
-          </Button>
-        </div>
       </div>
     </div>
   );
