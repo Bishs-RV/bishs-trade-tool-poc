@@ -6,6 +6,7 @@ import { isMotorized } from '@/lib/constants';
 import type { TradeEvaluation } from '@/lib/db/schema';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import PriorEvaluationsDialog from '@/components/PriorEvaluationsDialog';
 import CustomerInfoFields from '@/components/CustomerInfoFields';
 import StockVinFields from '@/components/StockVinFields';
@@ -77,18 +78,19 @@ export default function Section1UnitData({
 
         {/* Search Prior Evaluations Button */}
         {onLoadEvaluation && (
-          <button
+          <Button
             type="button"
+            variant="primary"
             onClick={() => setIsPriorEvaluationsOpen(true)}
             disabled={!data.vin && !data.stockNumber}
-            className={`w-full py-1.5 text-xs font-medium rounded-md border transition-colors ${
-              data.vin || data.stockNumber
-                ? 'text-blue-700 border-blue-300 bg-blue-50 hover:bg-blue-100'
-                : 'text-gray-400 border-gray-200 bg-gray-50 cursor-not-allowed'
-            }`}
+            className="w-full"
           >
-            Search Prior Evaluations
-          </button>
+            {!data.vin && !data.stockNumber ? (
+              <span className="text-gray-300">Enter VIN or Stock # to search</span>
+            ) : (
+              'Search Prior Evaluations'
+            )}
+          </Button>
         )}
 
         {/* Location and RV Type */}

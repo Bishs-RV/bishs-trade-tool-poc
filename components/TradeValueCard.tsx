@@ -35,9 +35,10 @@ export default function TradeValueCard({
       {/* Lookup Button */}
       <Button
         type="button"
+        variant="primary"
         onClick={onLookup}
         disabled={!isLookupReady || isLookupComplete || isLoading}
-        className="w-full mt-2 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]"
+        className="w-full mt-2"
       >
         {isLoading ? (
           <span className="flex items-center justify-center gap-2">

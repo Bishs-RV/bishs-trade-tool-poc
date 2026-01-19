@@ -9,12 +9,12 @@ import {
   DriverId,
   TradeValues,
 } from '@/lib/calculations';
+import { TARGET_MARGIN_PERCENT } from '@/lib/constants';
 import Section1UnitData from '@/components/Section1UnitData';
 import Section2Condition from '@/components/Section2Condition';
 import Section3Market from '@/components/Section3Market';
 import Section4Valuation from '@/components/Section4Valuation';
 import { Textarea } from '@/components/ui/textarea';
-import { Button } from '@/components/ui/button';
 
 const initialData: TradeData = {
   customerName: '',
@@ -38,7 +38,7 @@ const initialData: TradeData = {
   additionalPrepCost: 0,
   avgListingPrice: 0,
   tradeInPercent: 1.0,
-  targetMarginPercent: 0.25,
+  targetMarginPercent: TARGET_MARGIN_PERCENT,
   retailSource: 'bish',
   customRetailPrice: 0,
   retailPriceSource: 'jdpower',
@@ -302,7 +302,7 @@ export default function TradeForm() {
       additionalPrepCost: evaluation.additionalPrepCost ? parseFloat(evaluation.additionalPrepCost) : 0,
       avgListingPrice: evaluation.avgListingPrice ? parseFloat(evaluation.avgListingPrice) : 0,
       tradeInPercent: evaluation.tradeInPercent ? parseFloat(evaluation.tradeInPercent) : 1.0,
-      targetMarginPercent: evaluation.targetMarginPercent ? parseFloat(evaluation.targetMarginPercent) : 0.25,
+      targetMarginPercent: evaluation.targetMarginPercent ? parseFloat(evaluation.targetMarginPercent) : TARGET_MARGIN_PERCENT,
       retailPriceSource: (evaluation.retailPriceSource as 'jdpower' | 'custom') || 'jdpower',
       customRetailValue: evaluation.customRetailValue ? parseFloat(evaluation.customRetailValue) : 0,
       valuationNotes: evaluation.valuationNotes || '',
@@ -315,11 +315,11 @@ export default function TradeForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 gap-2">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-2">
       {/* 3-Column Grid for Sections 1, 2, 3 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 flex-1 min-h-0">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2">
         {/* COLUMN 1: Section 1 - Unit & Base Data */}
-        <div className="lg:col-span-1 overflow-auto">
+        <div className="lg:col-span-1">
           <Section1UnitData
             data={data}
             calculated={calculated}
@@ -332,7 +332,7 @@ export default function TradeForm() {
         </div>
 
         {/* COLUMN 2: Section 2 - Condition & Prep Costs */}
-        <div className="lg:col-span-1 overflow-auto">
+        <div className="lg:col-span-1">
           <Section2Condition
             data={data}
             calculated={calculated}
@@ -349,18 +349,47 @@ export default function TradeForm() {
           />
         </div>
 
-        {/* COLUMN 3: Section 3 - Market Data */}
-        <div className="lg:col-span-1 overflow-auto">
-          <Section3Market
-            data={data}
-            onUpdate={(updates) => handleUpdate(updates, 'avg-listing-price')}
-            isLocked={!isLookupComplete}
-          />
+        {/* COLUMN 3: Section 3 - Market Data + Valuation Notes */}
+        <div className="lg:col-span-1 flex flex-col gap-2">
+          <div className="flex-1">
+            <Section3Market
+              data={data}
+              onUpdate={(updates) => handleUpdate(updates, 'avg-listing-price')}
+              isLocked={!isLookupComplete}
+            />
+          </div>
+
+          {/* Valuation Notes Card */}
+          <div className="relative flex-1 flex flex-col">
+            <div
+              className={`bg-white p-4 rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 flex-1 flex flex-col ${!isLookupComplete ? 'pointer-events-none select-none' : ''}`}
+            >
+              {!isLookupComplete && (
+                <div className="absolute inset-0 bg-gradient-to-br from-white/95 to-gray-100/95 backdrop-blur-md z-20 rounded-xl flex items-center justify-center pointer-events-auto">
+                  <div className="text-center border-2 border-dashed border-gray-400 rounded-lg p-4 bg-white/70 shadow-lg">
+                    <p className="text-sm font-bold text-gray-600">Complete Step 1 to unlock</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100">
+                <h2 className="text-lg font-bold text-gray-900">Valuation Notes</h2>
+              </div>
+
+              <Textarea
+                className="resize-none flex-1 min-h-[100px]"
+                placeholder="Negotiations, sign-off, special terms..."
+                value={data.valuationNotes}
+                onChange={(e) => setData({ ...data, valuationNotes: e.target.value })}
+                disabled={!isLookupComplete}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Full-Width Section 4 - Valuation Levers */}
-      <div className="flex-shrink-0">
+      <div>
         <Section4Valuation
           data={data}
           calculated={calculated}
@@ -378,38 +407,8 @@ export default function TradeForm() {
             handleUpdate(updates, driverId);
           }}
           isLocked={!isLookupComplete}
+          isSubmitting={isSubmitting}
         />
-      </div>
-
-      {/* Notes + Submit Row */}
-      <div className="flex-shrink-0 flex gap-2">
-        <div className="flex-1 p-2 bg-white rounded-lg shadow-md border border-gray-200">
-          <Textarea
-            rows={2}
-            className="resize-none"
-            placeholder="Valuation notes: negotiations, sign-off, special terms..."
-            value={data.valuationNotes}
-            onChange={(e) => setData({ ...data, valuationNotes: e.target.value })}
-            disabled={!isLookupComplete}
-          />
-        </div>
-        <Button
-          type="submit"
-          className="px-8 py-3 text-lg text-white font-bold rounded-lg shadow-lg bg-gradient-to-r from-slate-600 via-slate-700 to-slate-800 hover:from-slate-700 hover:via-slate-800 hover:to-slate-900 hover:scale-[1.02] active:scale-[0.98] border border-slate-500 disabled:hover:scale-100 flex-shrink-0"
-          disabled={!isLookupComplete || isSubmitting}
-        >
-          {isSubmitting ? (
-            <span className="flex items-center gap-2">
-              <span className="animate-spin">⏳</span>
-              <span>SAVING...</span>
-            </span>
-          ) : (
-            <span className="flex items-center gap-2">
-              <span>SUBMIT</span>
-              <span className="text-xl">→</span>
-            </span>
-          )}
-        </Button>
       </div>
     </form>
   );

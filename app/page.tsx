@@ -4,8 +4,8 @@ import TradeForm from '@/components/forms/TradeForm';
 
 export default function Home() {
   return (
-    <div className="h-screen overflow-hidden bg-gradient-to-br from-gray-100 via-blue-50 to-gray-100 p-2">
-      <div className="h-full flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-gray-100 via-blue-50 to-gray-100 p-2">
+      <div className="flex flex-col">
         {/* Header */}
         <header className="relative overflow-hidden text-center mb-2 py-2 px-4 bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900 rounded-lg shadow-lg border border-slate-600 flex-shrink-0">
           <div className="absolute inset-0 bg-gradient-to-br from-slate-500/10 to-transparent" />

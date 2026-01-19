@@ -25,9 +25,7 @@ export default function FinancialMetricsGrid({
   onUpdate,
 }: FinancialMetricsGridProps) {
   return (
-    <>
-      <h3 className="text-base font-bold text-gray-900 mb-2">Final Outputs</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 items-stretch">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 items-stretch">
         {/* 1. Retail Price (JD Power or Custom) */}
         <div className="bg-gradient-to-br from-gray-100 to-slate-200 rounded-lg p-3 text-center shadow-md border border-gray-300 hover:shadow-lg transition-all">
           <span className="block text-xs font-bold text-gray-600 mb-1 uppercase tracking-wide">
@@ -131,7 +129,6 @@ export default function FinancialMetricsGrid({
             {formatPercent(calculatedMarginPercent)}
           </span>
         </div>
-      </div>
-    </>
+    </div>
   );
 }

@@ -33,14 +33,14 @@ export default function Section2Condition({
           </div>
         )}
 
-        <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-gray-100">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-500 to-slate-700 flex items-center justify-center text-white font-bold text-lg shadow-lg">
+        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-500 to-slate-700 flex items-center justify-center text-white font-bold text-sm shadow-lg">
             2
           </div>
-          <h2 className="text-2xl font-bold text-gray-900">Condition & Prep Costs</h2>
+          <h2 className="text-lg font-bold text-gray-900">Condition & Prep Costs</h2>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-3">
           {/* Condition Score Slider */}
           <ConditionScoreSlider
             conditionScore={data.conditionScore}

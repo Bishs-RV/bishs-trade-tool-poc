@@ -51,18 +51,17 @@ export default function ValuationSliders({
             Target Calculated Margin %
           </FieldLabel>
 
-          {/* Target tick mark and label */}
-          <div className="relative pt-3">
+          {/* Slider with target tick mark */}
+          <div className="relative mt-6">
+            {/* Target tick mark positioned above slider */}
             <div
-              className="absolute top-0 left-0 right-0 flex justify-start pointer-events-none"
-              style={{ paddingLeft: `${(TARGET_MARGIN_PERCENT / 0.4) * 100}%` }}
+              className="absolute bottom-full mb-1 pointer-events-none"
+              style={{ left: '74%', transform: 'translateX(-50%)' }}
             >
-              <div className="relative" style={{ marginLeft: '-28px' }}>
-                <span className="block text-xs font-bold text-green-600 whitespace-nowrap mb-0.5">
-                  18% Target
-                </span>
-                <div className="w-0.5 h-3 bg-green-600 mx-auto"></div>
-              </div>
+              <span className="block text-xs font-bold text-green-600 whitespace-nowrap text-center">
+                {formatPercent(TARGET_MARGIN_PERCENT)} Target
+              </span>
+              <div className="w-0.5 h-2 bg-green-600 mx-auto"></div>
             </div>
 
             <Slider
