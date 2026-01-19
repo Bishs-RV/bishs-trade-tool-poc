@@ -2,25 +2,19 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { TradeData, CalculatedValues, RVType } from '@/lib/types';
-import { LOCATIONS, RV_TYPE_OPTIONS, isMotorized } from '@/lib/constants';
+import { isMotorized } from '@/lib/constants';
 import { formatCurrency } from '@/lib/calculations';
 import { getCategoryId } from '@/lib/jdpower/rv-types';
 import type { MakeCategory, ModelTrim } from '@/lib/jdpower/types';
 import type { TradeEvaluation } from '@/lib/db/schema';
 import { SearchableCombobox, type ComboboxOption } from '@/components/ui/searchable-combobox';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import PriorEvaluationsDialog from '@/components/PriorEvaluationsDialog';
 import CustomerInfoFields from '@/components/CustomerInfoFields';
 import StockVinFields from '@/components/StockVinFields';
+import LocationRvTypeSelector from '@/components/LocationRvTypeSelector';
 
 interface Section1Props {
   data: TradeData;
@@ -315,39 +309,13 @@ export default function Section1UnitData({
           </button>
         )}
 
-        {/* Location */}
-        <div>
-          <Label htmlFor="location" className="text-xs font-semibold text-gray-700">
-            Location <span className="text-red-600">*</span>
-          </Label>
-          <Select value={data.location} onValueChange={(value) => onUpdate({ location: value })}>
-            <SelectTrigger id="location" className="mt-0.5">
-              <SelectValue placeholder="Select Store" />
-            </SelectTrigger>
-            <SelectContent>
-              {LOCATIONS.map(loc => (
-                <SelectItem key={loc} value={loc}>{loc}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* RV Type - triggers manufacturer fetch */}
-        <div>
-          <Label htmlFor="rv-type" className="text-xs font-semibold text-gray-700">
-            RV Type <span className="text-red-600">*</span>
-          </Label>
-          <Select value={data.rvType} onValueChange={handleRvTypeChange}>
-            <SelectTrigger id="rv-type" className="mt-0.5">
-              <SelectValue placeholder="Select RV Type" />
-            </SelectTrigger>
-            <SelectContent>
-              {RV_TYPE_OPTIONS.map(opt => (
-                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {/* Location and RV Type */}
+        <LocationRvTypeSelector
+          location={data.location}
+          rvType={data.rvType}
+          onLocationChange={(location) => onUpdate({ location })}
+          onRvTypeChange={handleRvTypeChange}
+        />
 
         {/* Manufacturer - from JD Power (depends on RV Type) */}
         <div>
