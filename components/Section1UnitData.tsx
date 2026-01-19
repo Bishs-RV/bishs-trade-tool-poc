@@ -3,16 +3,15 @@
 import { useState } from 'react';
 import { TradeData, CalculatedValues, RVType } from '@/lib/types';
 import { isMotorized } from '@/lib/constants';
-import { formatCurrency } from '@/lib/calculations';
 import type { TradeEvaluation } from '@/lib/db/schema';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
 import PriorEvaluationsDialog from '@/components/PriorEvaluationsDialog';
 import CustomerInfoFields from '@/components/CustomerInfoFields';
 import StockVinFields from '@/components/StockVinFields';
 import LocationRvTypeSelector from '@/components/LocationRvTypeSelector';
 import JDPowerCascadingLookup from '@/components/JDPowerCascadingLookup';
+import TradeValueCard from '@/components/TradeValueCard';
 
 interface Section1Props {
   data: TradeData;
@@ -43,7 +42,7 @@ export default function Section1UnitData({
     data.rvType !== null &&
     data.model.trim() !== '' &&
     (isCustomInputMode
-      ? data.customManufacturer || data.jdPowerManufacturerId !== null
+      ? !!data.customManufacturer || data.jdPowerManufacturerId !== null
       : data.jdPowerManufacturerId !== null &&
         data.make.trim() !== '' &&
         data.jdPowerModelTrimId !== null);
@@ -129,37 +128,14 @@ export default function Section1UnitData({
           />
         </div>
 
-        <hr className="border-gray-200 mt-2" />
-
-        {/* JD Power Trade-In (Read-Only Reference) */}
-        <div className="bg-gradient-to-br from-gray-100 to-slate-200 rounded-lg p-3 text-center shadow-md border border-gray-300">
-          <span className="block text-xs font-bold text-gray-600 uppercase tracking-wide">
-            JD Power Trade-In (Reference)
-          </span>
-          <span className="block text-lg font-black text-gray-900 mt-1">
-            {formatCurrency(calculated.jdPowerTradeIn)}
-          </span>
-        </div>
-
-        {/* Lookup Button */}
-        <Button
-          type="button"
-          onClick={onLookup}
-          disabled={!isLookupReady || isLookupComplete || isLoading}
-          className="w-full mt-2 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]"
-        >
-          {isLoading ? (
-            <span className="flex items-center justify-center gap-2">
-              <span className="animate-spin">⏳</span> Loading...
-            </span>
-          ) : isLookupComplete ? (
-            <span className="flex items-center justify-center gap-2">
-              <span className="text-xl">✓</span> Trade Value Loaded
-            </span>
-          ) : (
-            'Get Trade Value'
-          )}
-        </Button>
+        {/* Trade Value Display and Lookup Button */}
+        <TradeValueCard
+          jdPowerTradeIn={calculated.jdPowerTradeIn}
+          isLookupReady={isLookupReady}
+          isLookupComplete={isLookupComplete}
+          isLoading={isLoading}
+          onLookup={onLookup}
+        />
       </div>
 
       {/* Prior Evaluations Dialog */}
