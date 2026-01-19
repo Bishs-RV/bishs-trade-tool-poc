@@ -1,13 +1,10 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState } from 'react';
 import { TradeData, CalculatedValues, RVType } from '@/lib/types';
 import { isMotorized } from '@/lib/constants';
 import { formatCurrency } from '@/lib/calculations';
-import { getCategoryId } from '@/lib/jdpower/rv-types';
-import type { MakeCategory, ModelTrim } from '@/lib/jdpower/types';
 import type { TradeEvaluation } from '@/lib/db/schema';
-import { SearchableCombobox, type ComboboxOption } from '@/components/ui/searchable-combobox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -15,6 +12,7 @@ import PriorEvaluationsDialog from '@/components/PriorEvaluationsDialog';
 import CustomerInfoFields from '@/components/CustomerInfoFields';
 import StockVinFields from '@/components/StockVinFields';
 import LocationRvTypeSelector from '@/components/LocationRvTypeSelector';
+import JDPowerCascadingLookup from '@/components/JDPowerCascadingLookup';
 
 interface Section1Props {
   data: TradeData;
@@ -38,235 +36,20 @@ export default function Section1UnitData({
   const isMileageEnabled = isMotorized(data.rvType);
   const [isPriorEvaluationsOpen, setIsPriorEvaluationsOpen] = useState(false);
 
-  // JD Power cascading data
-  const [manufacturers, setManufacturers] = useState<MakeCategory[]>([]);
-  const [years, setYears] = useState<number[]>([]);
-  const [modelTrims, setModelTrims] = useState<ModelTrim[]>([]);
-  const [isLoadingMakes, setIsLoadingMakes] = useState(false);
-  const [isLoadingYears, setIsLoadingYears] = useState(false);
-  const [isLoadingModels, setIsLoadingModels] = useState(false);
-
-  // Use ref to avoid onUpdate in dependency arrays (prevents infinite loops)
-  const onUpdateRef = useRef(onUpdate);
-  useEffect(() => { onUpdateRef.current = onUpdate; });
-
-  // Derived data for dropdowns
-  const uniqueMakes = Array.from(new Set(modelTrims.map(m => m.ModelSeries))).filter(Boolean).sort();
-  const filteredModels = modelTrims.filter(m => m.ModelSeries === data.make);
-
-  // Memoized options for comboboxes
-  const yearOptions = useMemo<ComboboxOption[]>(
-    () => years.map(y => ({ value: y.toString(), label: y.toString() })),
-    [years]
-  );
-
-  const manufacturerOptions = useMemo<ComboboxOption[]>(
-    () => manufacturers.map(m => ({
-      value: m.makeReturnTO.MakeID.toString(),
-      label: m.makeReturnTO.MakeDisplayName,
-    })),
-    [manufacturers]
-  );
-
-  const makeOptions = useMemo<ComboboxOption[]>(
-    () => uniqueMakes.map(make => ({ value: make, label: make })),
-    [uniqueMakes]
-  );
-
-  const modelOptions = useMemo<ComboboxOption[]>(
-    () => filteredModels.map(model => ({
-      value: model.ModelTrimID.toString(),
-      label: model.ModelTrimName,
-    })),
-    [filteredModels]
-  );
-
-  useEffect(() => {
-    if (!data.rvType) {
-      setManufacturers([]);
-      return;
-    }
-
-    const abortController = new AbortController();
-    setIsLoadingMakes(true);
-
-    (async () => {
-      try {
-        const categoryId = getCategoryId(data.rvType);
-        const response = await fetch(
-          `/api/jdpower/makes?rvCategoryId=${categoryId}`,
-          { signal: abortController.signal }
-        );
-        if (!response.ok) throw new Error('Failed to fetch manufacturers');
-        const result = await response.json();
-        setManufacturers(result.makes || []);
-      } catch (error) {
-        if (!abortController.signal.aborted) {
-          console.error('Error fetching manufacturers:', error);
-          setManufacturers([]);
-        }
-      } finally {
-        setIsLoadingMakes(false);
-      }
-    })();
-
-    setYears([]);
-    setModelTrims([]);
-    onUpdateRef.current({
-      jdPowerManufacturerId: null,
-      manufacturerName: '',
-      year: null,
-      make: '',
-      model: '',
-      jdPowerModelTrimId: null,
-    });
-
-    return () => abortController.abort();
-  }, [data.rvType]);
-
-  useEffect(() => {
-    if (!data.jdPowerManufacturerId) {
-      setYears([]);
-      return;
-    }
-
-    const abortController = new AbortController();
-    setIsLoadingYears(true);
-
-    (async () => {
-      try {
-        const response = await fetch(
-          `/api/jdpower/years?makeId=${data.jdPowerManufacturerId}`,
-          { signal: abortController.signal }
-        );
-        if (!response.ok) throw new Error('Failed to fetch years');
-        const result = await response.json();
-        setYears(result.years || []);
-      } catch (error) {
-        if (!abortController.signal.aborted) {
-          console.error('Error fetching years:', error);
-          setYears([]);
-        }
-      } finally {
-        setIsLoadingYears(false);
-      }
-    })();
-
-    setModelTrims([]);
-    onUpdateRef.current({
-      year: null,
-      make: '',
-      model: '',
-      jdPowerModelTrimId: null,
-    });
-
-    return () => abortController.abort();
-  }, [data.jdPowerManufacturerId]);
-
-  useEffect(() => {
-    if (!data.year || !data.rvType || !data.jdPowerManufacturerId) {
-      setModelTrims([]);
-      return;
-    }
-
-    const abortController = new AbortController();
-    setIsLoadingModels(true);
-    setModelTrims([]);
-    onUpdateRef.current({
-      make: '',
-      model: '',
-      jdPowerModelTrimId: null,
-    });
-
-    (async () => {
-      try {
-        const categoryId = getCategoryId(data.rvType);
-        const response = await fetch(
-          `/api/jdpower/model-trims?makeId=${data.jdPowerManufacturerId}&year=${data.year}&rvCategoryId=${categoryId}`,
-          { signal: abortController.signal }
-        );
-        if (!response.ok) throw new Error('Failed to fetch models');
-        const result = await response.json();
-        setModelTrims(result.modelTrims || []);
-      } catch (error) {
-        if (!abortController.signal.aborted) {
-          console.error('Error fetching models:', error);
-          setModelTrims([]);
-        }
-      } finally {
-        setIsLoadingModels(false);
-      }
-    })();
-
-    return () => abortController.abort();
-  }, [data.year, data.jdPowerManufacturerId, data.rvType]);
-
-  const isCustomInputMode = !!(
-    data.customManufacturer ||
-    data.customMake ||
-    data.customModel
-  );
+  const isCustomInputMode = !!(data.customManufacturer || data.customMake || data.customModel);
 
   const isLookupReady =
     data.year !== null &&
     data.rvType !== null &&
     data.model.trim() !== '' &&
     (isCustomInputMode
-      ? (data.customManufacturer || data.jdPowerManufacturerId !== null)
-      : (data.jdPowerManufacturerId !== null &&
-         data.make.trim() !== '' &&
-         data.jdPowerModelTrimId !== null));
+      ? data.customManufacturer || data.jdPowerManufacturerId !== null
+      : data.jdPowerManufacturerId !== null &&
+        data.make.trim() !== '' &&
+        data.jdPowerModelTrimId !== null);
 
-  const handleYearChange = (option: ComboboxOption) => {
-    const yearValue = parseInt(option.isCustom ? option.label : option.value, 10);
-    if (!isNaN(yearValue) && yearValue >= 1980 && yearValue <= 2100) {
-      onUpdate({ year: yearValue });
-    }
-  };
-
-  const handleRvTypeChange = (value: string) => {
-    onUpdate({ rvType: value as RVType, mileage: null });
-  };
-
-  const handleManufacturerChange = (option: ComboboxOption) => {
-    onUpdate(option.isCustom ? {
-      jdPowerManufacturerId: null,
-      manufacturerName: option.label,
-      customManufacturer: option.label,
-    } : {
-      jdPowerManufacturerId: parseInt(option.value, 10),
-      manufacturerName: option.label,
-      customManufacturer: undefined,
-    });
-  };
-
-  const handleMakeChange = (option: ComboboxOption) => {
-    onUpdate({
-      make: option.isCustom ? option.label : option.value,
-      customMake: option.isCustom ? option.label : undefined,
-      model: '',
-      jdPowerModelTrimId: null,
-    });
-  };
-
-  const handleModelChange = (option: ComboboxOption) => {
-    if (option.isCustom) {
-      onUpdate({
-        model: option.label,
-        customModel: option.label,
-        jdPowerModelTrimId: null,
-      });
-      return;
-    }
-
-    const selectedModel = modelTrims.find(m => m.ModelTrimID.toString() === option.value);
-    if (selectedModel) {
-      onUpdate({
-        model: selectedModel.ModelTrimName,
-        customModel: undefined,
-        jdPowerModelTrimId: selectedModel.ModelTrimID,
-      });
-    }
+  const handleRvTypeChange = (rvType: RVType) => {
+    onUpdate({ rvType, mileage: null });
   };
 
   return (
@@ -317,80 +100,18 @@ export default function Section1UnitData({
           onRvTypeChange={handleRvTypeChange}
         />
 
-        {/* Manufacturer - from JD Power (depends on RV Type) */}
-        <div>
-          <Label htmlFor="manufacturer" className="text-xs font-semibold text-gray-700">
-            Manufacturer <span className="text-red-600">*</span>
-          </Label>
-          <SearchableCombobox
-            id="manufacturer"
-            label="Manufacturer"
-            placeholder="Select Manufacturer"
-            searchPlaceholder="Search manufacturers..."
-            options={manufacturerOptions}
-            value={data.customManufacturer ? `custom:${data.customManufacturer}` : data.jdPowerManufacturerId?.toString() ?? null}
-            onChange={handleManufacturerChange}
-            isLoading={isLoadingMakes}
-            disabled={!data.rvType}
-            allowCustom={true}
-          />
-        </div>
-
-        {/* Year - from JD Power (depends on Manufacturer) or custom entry */}
-        <div>
-          <Label htmlFor="year" className="text-xs font-semibold text-gray-700">
-            Year <span className="text-red-600">*</span>
-          </Label>
-          <SearchableCombobox
-            id="year"
-            label="Year"
-            placeholder="Select Year"
-            searchPlaceholder="Search years..."
-            options={yearOptions}
-            value={data.year?.toString() ?? null}
-            onChange={handleYearChange}
-            isLoading={isLoadingYears}
-            disabled={!data.jdPowerManufacturerId && !data.customManufacturer}
-            allowCustom={true}
-          />
-        </div>
-
-        {/* Make (ModelSeries from JD Power - depends on Year) */}
-        <div>
-          <Label htmlFor="make" className="text-xs font-semibold text-gray-700">
-            Make <span className="text-red-600">*</span>
-          </Label>
-          <SearchableCombobox
-            id="make"
-            label="Make"
-            placeholder="Select Make"
-            searchPlaceholder="Search makes..."
-            options={makeOptions}
-            value={data.customMake ? `custom:${data.customMake}` : data.make || null}
-            onChange={handleMakeChange}
-            isLoading={isLoadingModels}
-            disabled={!data.year && !data.customManufacturer}
-            allowCustom={true}
-          />
-        </div>
-
-        {/* Model (ModelTrimName from JD Power - depends on Make) */}
-        <div>
-          <Label htmlFor="model" className="text-xs font-semibold text-gray-700">
-            Model/Floorplan <span className="text-red-600">*</span>
-          </Label>
-          <SearchableCombobox
-            id="model"
-            label="Model"
-            placeholder="Select Model"
-            searchPlaceholder="Search models..."
-            options={modelOptions}
-            value={data.customModel ? `custom:${data.customModel}` : data.jdPowerModelTrimId?.toString() ?? null}
-            onChange={handleModelChange}
-            disabled={!data.make && !data.customMake}
-            allowCustom={true}
-          />
-        </div>
+        {/* JD Power Cascading Lookup (Manufacturer → Year → Make → Model) */}
+        <JDPowerCascadingLookup
+          rvType={data.rvType}
+          jdPowerManufacturerId={data.jdPowerManufacturerId}
+          customManufacturer={data.customManufacturer}
+          year={data.year}
+          make={data.make}
+          customMake={data.customMake}
+          customModel={data.customModel}
+          jdPowerModelTrimId={data.jdPowerModelTrimId}
+          onUpdate={onUpdate}
+        />
 
         {/* Mileage */}
         <div>
@@ -403,8 +124,8 @@ export default function Section1UnitData({
             className="mt-0.5 disabled:bg-gray-100 disabled:text-gray-500"
             placeholder="e.g., 15000"
             disabled={!isMileageEnabled}
-            value={data.mileage || ''}
-            onChange={(e) => onUpdate({ mileage: e.target.value ? parseInt(e.target.value) : null })}
+            value={data.mileage !== null ? data.mileage : ''}
+            onChange={(e) => onUpdate({ mileage: e.target.value ? parseInt(e.target.value, 10) : null })}
           />
         </div>
 
