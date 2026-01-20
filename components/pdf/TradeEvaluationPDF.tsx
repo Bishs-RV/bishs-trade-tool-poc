@@ -21,102 +21,104 @@ interface TradeEvaluationPDFProps {
 
 const styles = StyleSheet.create({
   page: {
-    padding: 40,
+    padding: 30,
     fontFamily: 'Helvetica',
     fontSize: 10,
     color: '#1f2937',
   },
   header: {
-    marginBottom: 20,
+    marginBottom: 14,
     borderBottomWidth: 2,
     borderBottomColor: '#374151',
-    paddingBottom: 12,
+    paddingBottom: 10,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#1f2937',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   headerSubtitle: {
-    fontSize: 10,
+    fontSize: 9,
     color: '#6b7280',
   },
   section: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 'bold',
     backgroundColor: '#f3f4f6',
-    padding: 6,
-    marginBottom: 8,
+    padding: 5,
+    marginBottom: 6,
     color: '#374151',
   },
   row: {
     flexDirection: 'row',
-    marginBottom: 4,
-    paddingVertical: 2,
+    marginBottom: 3,
+    paddingVertical: 1,
   },
   label: {
     width: '45%',
     color: '#6b7280',
+    fontSize: 9,
   },
   value: {
     width: '55%',
     fontWeight: 'bold',
+    fontSize: 9,
   },
   twoColumn: {
     flexDirection: 'row',
-    gap: 20,
+    gap: 16,
   },
   column: {
     flex: 1,
   },
   offerSection: {
     backgroundColor: '#ea580c',
-    padding: 16,
-    marginVertical: 16,
+    padding: 12,
+    marginVertical: 12,
     borderRadius: 4,
     alignItems: 'center',
   },
   offerLabel: {
-    fontSize: 10,
+    fontSize: 9,
     color: '#fff7ed',
-    marginBottom: 4,
+    marginBottom: 2,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   offerValue: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     color: 'white',
   },
   notesSection: {
     marginTop: 12,
-    padding: 10,
+    padding: 12,
     backgroundColor: '#fefce8',
     borderRadius: 4,
   },
   notesLabel: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: 'bold',
     color: '#854d0e',
     marginBottom: 4,
   },
   notesText: {
-    fontSize: 9,
+    fontSize: 10,
     color: '#713f12',
     lineHeight: 1.4,
   },
   disclosures: {
-    marginTop: 20,
+    marginTop: 16,
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
-    paddingTop: 12,
+    paddingTop: 10,
   },
   disclosuresTitle: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: 'bold',
     color: '#6b7280',
     marginBottom: 6,
@@ -141,9 +143,8 @@ const styles = StyleSheet.create({
   },
 });
 
-function getRVTypeLabel(rvType: string): string {
-  const option = RV_TYPE_OPTIONS.find((opt) => opt.value === rvType);
-  return option?.label || rvType;
+function getRVTypeLabel(rvType: string) {
+  return RV_TYPE_OPTIONS.find((opt) => opt.value === rvType)?.label || rvType;
 }
 
 export function TradeEvaluationPDF({
@@ -158,8 +159,7 @@ export function TradeEvaluationPDF({
     day: 'numeric',
   });
 
-  const hasCustomerInfo =
-    data.customerName || data.customerPhone || data.customerEmail;
+  const hasCustomerInfo = !!(data.customerName || data.customerPhone || data.customerEmail);
 
   return (
     <Document>
@@ -172,28 +172,55 @@ export function TradeEvaluationPDF({
           </Text>
         </View>
 
-        {/* Customer Info (if provided) */}
-        {hasCustomerInfo && (
+        {/* Customer Info & Market Analysis - side by side */}
+        {(hasCustomerInfo || depreciation?.monthsToSell !== undefined) && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Customer Information</Text>
-            {data.customerName && (
-              <View style={styles.row}>
-                <Text style={styles.label}>Name</Text>
-                <Text style={styles.value}>{data.customerName}</Text>
-              </View>
-            )}
-            {data.customerPhone && (
-              <View style={styles.row}>
-                <Text style={styles.label}>Phone</Text>
-                <Text style={styles.value}>{data.customerPhone}</Text>
-              </View>
-            )}
-            {data.customerEmail && (
-              <View style={styles.row}>
-                <Text style={styles.label}>Email</Text>
-                <Text style={styles.value}>{data.customerEmail}</Text>
-              </View>
-            )}
+            <View style={styles.twoColumn}>
+              {/* Customer Info */}
+              {hasCustomerInfo && (
+                <View style={styles.column}>
+                  <Text style={styles.sectionTitle}>Customer Information</Text>
+                  {data.customerName && (
+                    <View style={styles.row}>
+                      <Text style={styles.label}>Name</Text>
+                      <Text style={styles.value}>{data.customerName}</Text>
+                    </View>
+                  )}
+                  {data.customerPhone && (
+                    <View style={styles.row}>
+                      <Text style={styles.label}>Phone</Text>
+                      <Text style={styles.value}>{data.customerPhone}</Text>
+                    </View>
+                  )}
+                  {data.customerEmail && (
+                    <View style={styles.row}>
+                      <Text style={styles.label}>Email</Text>
+                      <Text style={styles.value}>{data.customerEmail}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+              {/* Market Analysis */}
+              {depreciation?.monthsToSell !== undefined && (
+                <View style={styles.column}>
+                  <Text style={styles.sectionTitle}>Market Analysis</Text>
+                  <View style={styles.row}>
+                    <Text style={styles.label}>Est. Time to Sell</Text>
+                    <Text style={styles.value}>
+                      {depreciation.monthsToSell} month{depreciation.monthsToSell !== 1 && 's'}
+                    </Text>
+                  </View>
+                  {depreciation.vehicleAge !== undefined && (
+                    <View style={styles.row}>
+                      <Text style={styles.label}>Vehicle Age</Text>
+                      <Text style={styles.value}>
+                        {depreciation.vehicleAge} year{depreciation.vehicleAge !== 1 && 's'}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
           </View>
         )}
 
@@ -242,26 +269,70 @@ export function TradeEvaluationPDF({
           </View>
         </View>
 
-        {/* Depreciation Info (if available) */}
-        {depreciation?.monthsToSell !== undefined && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Market Analysis</Text>
-            <View style={styles.row}>
-              <Text style={styles.label}>Estimated Time to Sell</Text>
-              <Text style={styles.value}>
-                {depreciation.monthsToSell} {depreciation.monthsToSell === 1 ? 'month' : 'months'}
-              </Text>
-            </View>
-            {depreciation.vehicleAge !== undefined && (
+        {/* Valuation Summary */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Valuation Summary</Text>
+          <View style={styles.twoColumn}>
+            <View style={styles.column}>
               <View style={styles.row}>
-                <Text style={styles.label}>Vehicle Age</Text>
+                <Text style={styles.label}>JD Power Trade-In</Text>
                 <Text style={styles.value}>
-                  {depreciation.vehicleAge} {depreciation.vehicleAge === 1 ? 'year' : 'years'}
+                  {formatCurrency(calculated.jdPowerTradeIn)}
                 </Text>
               </View>
-            )}
+              <View style={styles.row}>
+                <Text style={styles.label}>JD Power Retail Value</Text>
+                <Text style={styles.value}>
+                  {formatCurrency(calculated.jdPowerRetailValue)}
+                </Text>
+              </View>
+              <View style={styles.row}>
+                <Text style={styles.label}>Bish&apos;s TIV Base</Text>
+                <Text style={styles.value}>
+                  {formatCurrency(calculated.bishTIVBase)}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.column}>
+              <View style={styles.row}>
+                <Text style={styles.label}>PDI Cost</Text>
+                <Text style={styles.value}>
+                  {formatCurrency(calculated.pdiCost)}
+                </Text>
+              </View>
+              <View style={styles.row}>
+                <Text style={styles.label}>Recon Cost</Text>
+                <Text style={styles.value}>
+                  {formatCurrency(calculated.reconCost)}
+                </Text>
+              </View>
+              <View style={styles.row}>
+                <Text style={styles.label}>Sold Prep Cost</Text>
+                <Text style={styles.value}>
+                  {formatCurrency(calculated.soldPrepCost)}
+                </Text>
+              </View>
+              {data.additionalPrepCost > 0 && (
+                <View style={styles.row}>
+                  <Text style={styles.label}>Additional Costs</Text>
+                  <Text style={styles.value}>
+                    {formatCurrency(data.additionalPrepCost)}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.row}>
+                <Text style={styles.label}>Total Prep Costs</Text>
+                <Text style={styles.value}>
+                  {formatCurrency(calculated.totalPrepCosts)}
+                </Text>
+              </View>
+            </View>
           </View>
-        )}
+          <View style={[styles.row, { marginTop: 8, borderTopWidth: 1, borderTopColor: '#e5e7eb', paddingTop: 8 }]}>
+            <Text style={[styles.label, { fontWeight: 'bold' }]}>Total Bank Cost</Text>
+            <Text style={[styles.value, { fontSize: 11 }]}>{formatCurrency(calculated.totalUnitCosts)}</Text>
+          </View>
+        </View>
 
         {/* Final Offer (Prominent) */}
         <View style={styles.offerSection}>
@@ -281,11 +352,9 @@ export function TradeEvaluationPDF({
 
         {/* Disclosures */}
         <View style={styles.disclosures}>
-          <Text style={styles.disclosuresTitle}>
-            Important Disclosures
-          </Text>
+          <Text style={styles.disclosuresTitle}>Important Disclosures</Text>
           {DISCLOSURE_LIST.map((disclosure, index) => (
-            <Text key={disclosure} style={styles.disclosureItem}>
+            <Text key={index} style={styles.disclosureItem}>
               {index + 1}. {disclosure}
             </Text>
           ))}
