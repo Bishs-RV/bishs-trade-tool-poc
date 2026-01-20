@@ -7,14 +7,15 @@ import {
   View,
   StyleSheet,
 } from '@react-pdf/renderer';
-import { TradeData, CalculatedValues } from '@/lib/types';
-import { formatCurrency, formatPercent } from '@/lib/calculations';
+import { TradeData, CalculatedValues, DepreciationInfo } from '@/lib/types';
+import { formatCurrency } from '@/lib/calculations';
 import { RV_TYPE_OPTIONS, isMotorized } from '@/lib/constants';
 import { DISCLOSURE_LIST } from '@/lib/disclosures';
 
 interface TradeEvaluationPDFProps {
   data: TradeData;
   calculated: CalculatedValues;
+  depreciation?: DepreciationInfo;
   generatedDate?: Date;
 }
 
@@ -91,30 +92,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: 'white',
   },
-  metricsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 12,
-  },
-  metricBox: {
-    flex: 1,
-    backgroundColor: '#f3f4f6',
-    padding: 10,
-    marginHorizontal: 4,
-    borderRadius: 4,
-    alignItems: 'center',
-  },
-  metricLabel: {
-    fontSize: 8,
-    color: '#6b7280',
-    marginBottom: 4,
-    textTransform: 'uppercase',
-  },
-  metricValue: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#1f2937',
-  },
   notesSection: {
     marginTop: 12,
     padding: 10,
@@ -172,6 +149,7 @@ function getRVTypeLabel(rvType: string): string {
 export function TradeEvaluationPDF({
   data,
   calculated,
+  depreciation,
   generatedDate = new Date(),
 }: TradeEvaluationPDFProps) {
   const dateStr = generatedDate.toLocaleDateString('en-US', {
@@ -264,79 +242,26 @@ export function TradeEvaluationPDF({
           </View>
         </View>
 
-        {/* Valuation Summary */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Valuation Summary</Text>
-          <View style={styles.twoColumn}>
-            <View style={styles.column}>
-              <View style={styles.row}>
-                <Text style={styles.label}>JD Power Trade-In</Text>
-                <Text style={styles.value}>
-                  {formatCurrency(calculated.jdPowerTradeIn)}
-                </Text>
-              </View>
-              <View style={styles.row}>
-                <Text style={styles.label}>JD Power Retail Value</Text>
-                <Text style={styles.value}>
-                  {formatCurrency(calculated.jdPowerRetailValue)}
-                </Text>
-              </View>
-              <View style={styles.row}>
-                <Text style={styles.label}>Bish&apos;s TIV Base</Text>
-                <Text style={styles.value}>
-                  {formatCurrency(calculated.bishTIVBase)}
-                </Text>
-              </View>
+        {/* Depreciation Info (if available) */}
+        {depreciation?.monthsToSell !== undefined && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Market Analysis</Text>
+            <View style={styles.row}>
+              <Text style={styles.label}>Estimated Time to Sell</Text>
+              <Text style={styles.value}>
+                {depreciation.monthsToSell} {depreciation.monthsToSell === 1 ? 'month' : 'months'}
+              </Text>
             </View>
-            <View style={styles.column}>
+            {depreciation.vehicleAge !== undefined && (
               <View style={styles.row}>
-                <Text style={styles.label}>PDI Cost</Text>
+                <Text style={styles.label}>Vehicle Age</Text>
                 <Text style={styles.value}>
-                  {formatCurrency(calculated.pdiCost)}
+                  {depreciation.vehicleAge} {depreciation.vehicleAge === 1 ? 'year' : 'years'}
                 </Text>
               </View>
-              <View style={styles.row}>
-                <Text style={styles.label}>Recon Cost</Text>
-                <Text style={styles.value}>
-                  {formatCurrency(calculated.reconCost)}
-                </Text>
-              </View>
-              <View style={styles.row}>
-                <Text style={styles.label}>Sold Prep Cost</Text>
-                <Text style={styles.value}>
-                  {formatCurrency(calculated.soldPrepCost)}
-                </Text>
-              </View>
-              {data.additionalPrepCost > 0 && (
-                <View style={styles.row}>
-                  <Text style={styles.label}>Additional Costs</Text>
-                  <Text style={styles.value}>
-                    {formatCurrency(data.additionalPrepCost)}
-                  </Text>
-                </View>
-              )}
-              <View style={styles.row}>
-                <Text style={styles.label}>Total Prep Costs</Text>
-                <Text style={styles.value}>
-                  {formatCurrency(calculated.totalPrepCosts)}
-                </Text>
-              </View>
-            </View>
+            )}
           </View>
-          <View
-            style={[
-              styles.row,
-              { marginTop: 8, borderTopWidth: 1, borderTopColor: '#e5e7eb', paddingTop: 8 },
-            ]}
-          >
-            <Text style={[styles.label, { fontWeight: 'bold' }]}>
-              Total Bank Cost
-            </Text>
-            <Text style={[styles.value, { fontSize: 12 }]}>
-              {formatCurrency(calculated.totalUnitCosts)}
-            </Text>
-          </View>
-        </View>
+        )}
 
         {/* Final Offer (Prominent) */}
         <View style={styles.offerSection}>
@@ -344,34 +269,6 @@ export function TradeEvaluationPDF({
           <Text style={styles.offerValue}>
             {formatCurrency(calculated.finalTradeOffer)}
           </Text>
-        </View>
-
-        {/* Metrics Row */}
-        <View style={styles.metricsRow}>
-          <View style={styles.metricBox}>
-            <Text style={styles.metricLabel}>Retail Price</Text>
-            <Text style={styles.metricValue}>
-              {formatCurrency(calculated.activeRetailPrice)}
-            </Text>
-          </View>
-          <View style={styles.metricBox}>
-            <Text style={styles.metricLabel}>Replacement Cost</Text>
-            <Text style={styles.metricValue}>
-              {formatCurrency(calculated.replacementCost)}
-            </Text>
-          </View>
-          <View style={styles.metricBox}>
-            <Text style={styles.metricLabel}>Margin Amount</Text>
-            <Text style={styles.metricValue}>
-              {formatCurrency(calculated.calculatedMarginAmount)}
-            </Text>
-          </View>
-          <View style={styles.metricBox}>
-            <Text style={styles.metricLabel}>Margin %</Text>
-            <Text style={styles.metricValue}>
-              {formatPercent(calculated.calculatedMarginPercent)}
-            </Text>
-          </View>
         </View>
 
         {/* Notes Section (if provided) */}

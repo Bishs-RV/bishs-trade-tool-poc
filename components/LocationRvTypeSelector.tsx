@@ -1,15 +1,16 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { RVType } from '@/lib/types';
-import { LOCATIONS, RV_TYPE_OPTIONS } from '@/lib/constants';
+import { RV_TYPE_OPTIONS } from '@/lib/constants';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { SearchableCombobox, type ComboboxOption } from '@/components/ui/searchable-combobox';
 
-// Static options - derived from constants, no need for useMemo
-const locationOptions: ComboboxOption[] = LOCATIONS.map((loc) => ({
-  value: loc,
-  label: loc,
-}));
+interface LocationOption {
+  cmf: number;
+  location: string | null;
+  storename: string | null;
+}
 
 const rvTypeOptions: ComboboxOption[] = RV_TYPE_OPTIONS.map((opt) => ({
   value: opt.value,
@@ -31,6 +32,37 @@ export default function LocationRvTypeSelector({
   onLocationChange,
   onRvTypeChange,
 }: LocationRvTypeSelectorProps) {
+  // Location data from API
+  const [locationOptions, setLocationOptions] = useState<ComboboxOption[]>([]);
+  const [isLoadingLocations, setIsLoadingLocations] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+
+  // Fetch locations on mount
+  useEffect(() => {
+    const fetchLocations = async () => {
+      try {
+        const response = await fetch('/api/locations');
+        if (!response.ok) throw new Error('Failed to fetch locations');
+        const result = await response.json();
+        // Filter out locations with null location codes and map to ComboboxOption
+        const validLocations = (result.locations || [])
+          .filter((loc: LocationOption) => loc.location !== null)
+          .map((loc: LocationOption) => ({
+            value: loc.location!,
+            label: loc.storename ? `${loc.location} - ${loc.storename}` : loc.location!,
+          }));
+        setLocationOptions(validLocations);
+      } catch (error) {
+        console.error('Error fetching locations:', error);
+        setLoadError(true);
+        setLocationOptions([]);
+      } finally {
+        setIsLoadingLocations(false);
+      }
+    };
+
+    fetchLocations();
+  }, []);
 
   return (
     <>
@@ -41,7 +73,7 @@ export default function LocationRvTypeSelector({
         </FieldLabel>
         <SearchableCombobox
           label="Location"
-          placeholder="Select Store"
+          placeholder={loadError ? 'Error loading stores' : isLoadingLocations ? 'Loading...' : 'Select Store'}
           searchPlaceholder="Search locations..."
           options={locationOptions}
           value={location || null}

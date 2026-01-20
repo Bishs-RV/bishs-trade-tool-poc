@@ -3,7 +3,7 @@
 
 export const DISCLOSURES = {
   validity:
-    'This trade-in offer is valid for 14 calendar days from the date shown above.',
+    'This trade-in offer is valid for 7 calendar days from the date shown above.',
   inspection:
     'Final trade-in value is subject to physical inspection of the unit and verification of information provided.',
   condition:
