@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { TradeData, CalculatedValues, RVType } from '@/lib/types';
 import type { TradeEvaluation } from '@/lib/db/schema';
 import {
@@ -77,6 +77,17 @@ export default function TradeForm() {
   const [tradeValues, setTradeValues] = useState<TradeValues | undefined>(undefined);
   const [data, setData] = useState<TradeData>(initialData);
   const [calculated, setCalculated] = useState<CalculatedValues>(initialCalculated);
+
+  // Memoize depreciation data for PDF
+  const depreciation = useMemo(() => {
+    const result = tradeValues?.valuationResults?.[data.conditionScore.toString()];
+    if (!result) return undefined;
+    return {
+      monthsToSell: result.months_to_sell,
+      vehicleAge: result.vehicle_age,
+      totalDepreciationPercent: result.total_depreciation_percentage,
+    };
+  }, [tradeValues, data.conditionScore]);
 
   // Initial calculation on mount to set Trade-In % based on default margin
   useEffect(() => {
@@ -419,6 +430,9 @@ export default function TradeForm() {
       <StickyActionBar
         isLocked={!isLookupComplete}
         isSubmitting={isSubmitting}
+        data={data}
+        calculated={calculated}
+        depreciation={depreciation}
       />
     </form>
   );

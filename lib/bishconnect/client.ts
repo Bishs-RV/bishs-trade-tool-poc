@@ -2,6 +2,11 @@
 
 import { getBishConnectToken } from './auth'
 
+export interface DepreciationMonth {
+  month: string
+  amount: number
+}
+
 export interface ValuationResult {
   original_trade_value: number
   adjusted_value: number
@@ -10,6 +15,9 @@ export interface ValuationResult {
   total_depreciation_percentage: number
   mileage_adjustment_percentage: number
   condition_adjustment_percentage: number
+  months_to_sell?: number
+  vehicle_age?: number
+  depreciation_months?: DepreciationMonth[]
 }
 
 interface TradeValueResponse {

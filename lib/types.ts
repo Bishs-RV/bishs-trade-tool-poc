@@ -62,6 +62,12 @@ export interface ComparableUnit {
   soldDate?: string; // Date sold (if sold)
 }
 
+export interface DepreciationInfo {
+  monthsToSell?: number;
+  vehicleAge?: number;
+  totalDepreciationPercent?: number;
+}
+
 export interface CalculatedValues {
   // JD Power Values (raw from NADA)
   jdPowerTradeIn: number;
