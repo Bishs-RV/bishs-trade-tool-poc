@@ -5,6 +5,7 @@ import { RVType } from '@/lib/types';
 import { getCategoryId } from '@/lib/jdpower/rv-types';
 import type { MakeCategory, ModelTrim } from '@/lib/jdpower/types';
 import { SearchableCombobox, type ComboboxOption } from '@/components/ui/searchable-combobox';
+import { GroupedModelPicker } from '@/components/GroupedModelPicker';
 import { Field, FieldLabel } from '@/components/ui/field';
 
 interface JDPowerCascadingLookupProps {
@@ -56,12 +57,6 @@ export default function JDPowerCascadingLookup({
     onUpdateRef.current = onUpdate;
   });
 
-  // Derived data for dropdowns
-  const uniqueMakes = Array.from(new Set(modelTrims.map((m) => m.ModelSeries)))
-    .filter(Boolean)
-    .sort();
-  const filteredModels = modelTrims.filter((m) => m.ModelSeries === make);
-
   // Memoized options for comboboxes
   const yearOptions = useMemo<ComboboxOption[]>(
     () => years.map((y) => ({ value: y.toString(), label: y.toString() })),
@@ -75,20 +70,6 @@ export default function JDPowerCascadingLookup({
         label: m.makeReturnTO.MakeDisplayName,
       })),
     [manufacturers]
-  );
-
-  const makeOptions = useMemo<ComboboxOption[]>(
-    () => uniqueMakes.map((mk) => ({ value: mk, label: mk })),
-    [uniqueMakes]
-  );
-
-  const modelOptions = useMemo<ComboboxOption[]>(
-    () =>
-      filteredModels.map((m) => ({
-        value: m.ModelTrimID.toString(),
-        label: m.ModelTrimName,
-      })),
-    [filteredModels]
   );
 
   // Fetch manufacturers when rvType changes
@@ -239,31 +220,29 @@ export default function JDPowerCascadingLookup({
     }
   };
 
-  const handleMakeChange = (option: ComboboxOption) => {
-    onUpdate({
-      make: option.isCustom ? option.label : option.value,
-      customMake: option.isCustom ? option.label : undefined,
-      model: '',
-      jdPowerModelTrimId: null,
-    });
-  };
-
-  const handleModelChange = (option: ComboboxOption) => {
-    if (option.isCustom) {
+  const handleModelSelection = (
+    modelTrim: ModelTrim | null,
+    isCustom?: boolean,
+    customValue?: string
+  ) => {
+    if (isCustom && customValue) {
       onUpdate({
-        model: option.label,
-        customModel: option.label,
+        make: '',
+        customMake: undefined,
+        model: customValue,
+        customModel: customValue,
         jdPowerModelTrimId: null,
       });
       return;
     }
 
-    const selectedModel = modelTrims.find((m) => m.ModelTrimID.toString() === option.value);
-    if (selectedModel) {
+    if (modelTrim) {
       onUpdate({
-        model: selectedModel.ModelTrimName,
+        make: modelTrim.ModelSeries,
+        model: modelTrim.ModelTrimName,
+        customMake: undefined,
         customModel: undefined,
-        jdPowerModelTrimId: selectedModel.ModelTrimID,
+        jdPowerModelTrimId: modelTrim.ModelTrimID,
       });
     }
   };
@@ -310,37 +289,19 @@ export default function JDPowerCascadingLookup({
         />
       </Field>
 
-      {/* Make */}
-      <Field>
-        <FieldLabel className={labelClass}>
-          Make <span className="text-red-600">*</span>
-        </FieldLabel>
-        <SearchableCombobox
-          label="Make"
-          placeholder="Select Make"
-          searchPlaceholder="Search makes..."
-          options={makeOptions}
-          value={customMake ? `custom:${customMake}` : make || null}
-          onChange={handleMakeChange}
-          isLoading={isLoadingModels}
-          disabled={!year && !customManufacturer}
-          allowCustom={true}
-        />
-      </Field>
-
-      {/* Model */}
+      {/* Model (grouped by Make) */}
       <Field>
         <FieldLabel className={labelClass}>
           Model/Floorplan <span className="text-red-600">*</span>
         </FieldLabel>
-        <SearchableCombobox
-          label="Model"
-          placeholder="Select Model"
-          searchPlaceholder="Search models..."
-          options={modelOptions}
-          value={customModel ? `custom:${customModel}` : jdPowerModelTrimId?.toString() ?? null}
-          onChange={handleModelChange}
-          disabled={!make && !customMake}
+        <GroupedModelPicker
+          modelTrims={modelTrims}
+          value={jdPowerModelTrimId}
+          customModel={customModel}
+          make={customMake || make}
+          onChange={handleModelSelection}
+          isLoading={isLoadingModels}
+          disabled={!year || (!jdPowerManufacturerId && !customManufacturer)}
           allowCustom={true}
         />
       </Field>
