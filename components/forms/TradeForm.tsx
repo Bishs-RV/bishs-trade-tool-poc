@@ -1,76 +1,28 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useMockAuth } from '@bishs-rv/bishs-global-header';
-import { TradeData, CalculatedValues, RVType } from '@/lib/types';
-import type { TradeEvaluation } from '@/lib/db/schema';
+import type { TradeValues } from '@/lib/calculations';
 import {
-  calculateValuation,
-  calculateTradeInPercentFromMargin,
-  DriverId,
-  TradeValues,
-} from '@/lib/calculations';
-import { TARGET_MARGIN_PERCENT } from '@/lib/constants';
+  useTradeStore,
+  useTradeData,
+  useCalculated,
+  useIsLookupComplete,
+  useIsLoading,
+  useIsSubmitting,
+  useDepreciation,
+} from '@/lib/store';
+import {
+  DEFAULT_CONDITION_SCORE,
+  TARGET_MARGIN_PERCENT,
+} from '@/lib/constants';
 import Section1UnitData from '@/components/Section1UnitData';
 import Section2Condition from '@/components/Section2Condition';
 import Section3Market from '@/components/Section3Market';
 import Section4Valuation from '@/components/Section4Valuation';
 import StickyActionBar from '@/components/StickyActionBar';
 import { Textarea } from '@/components/ui/textarea';
-
-const VALID_RV_TYPES = ['TT', 'FW', 'POP', 'TC', 'CAG', 'CAD', 'CCG', 'CCD'] as const;
-const isValidRvType = (type: string | null): type is RVType =>
-  type !== null && VALID_RV_TYPES.includes(type as RVType);
-
-const initialData: TradeData = {
-  customerName: '',
-  customerPhone: '',
-  customerEmail: '',
-  stockNumber: '',
-  location: 'BMT',
-  year: null,
-  make: '',
-  model: '',
-  vin: '',
-  rvType: 'FW',
-  mileage: null,
-  originalListPrice: null,
-  jdPowerManufacturerId: null,
-  jdPowerModelTrimId: null,
-  manufacturerName: '',
-  conditionScore: 8,
-  majorIssues: '',
-  unitAddOns: '',
-  additionalPrepCost: 0,
-  avgListingPrice: 0,
-  tradeInPercent: 1.0,
-  targetMarginPercent: TARGET_MARGIN_PERCENT,
-  retailSource: 'bish',
-  customRetailPrice: 0,
-  retailPriceSource: 'jdpower',
-  customRetailValue: 0,
-  valuationNotes: '',
-};
-
-const initialCalculated: CalculatedValues = {
-  jdPowerTradeIn: 0,
-  jdPowerRetailValue: 0,
-  bishAdjustedTradeIn: 0,
-  pdiCost: 0,
-  reconCost: 0,
-  soldPrepCost: 0,
-  totalPrepCosts: 0,
-  bishTIVBase: 0,
-  totalUnitCosts: 0,
-  avgCompPrice: 0,
-  calculatedRetailPrice: 0,
-  replacementCost: 0,
-  activeRetailPrice: 0,
-  finalTradeOffer: 0,
-  calculatedMarginAmount: 0,
-  calculatedMarginPercent: 0,
-};
 
 export default function TradeForm() {
   // Get user from real auth (NextAuth) or fall back to mock auth
@@ -82,87 +34,36 @@ export default function TradeForm() {
     ? (session.user.name ?? "Unknown User")
     : (mockAuth.user?.name ?? "Test User");
 
-  const [isLookupComplete, setIsLookupComplete] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [tradeValues, setTradeValues] = useState<TradeValues | undefined>(undefined);
-  const [data, setData] = useState<TradeData>(initialData);
-  const [calculated, setCalculated] = useState<CalculatedValues>(initialCalculated);
+  // Zustand store state
+  const data = useTradeData();
+  const calculated = useCalculated();
+  const isLookupComplete = useIsLookupComplete();
+  const isLoading = useIsLoading();
+  const isSubmitting = useIsSubmitting();
+  const depreciation = useDepreciation();
 
-  // Memoize depreciation data for PDF
-  const depreciation = useMemo(() => {
-    const result = tradeValues?.valuationResults?.[data.conditionScore.toString()];
-    if (!result) return undefined;
-    return {
-      monthsToSell: result.months_to_sell,
-      vehicleAge: result.vehicle_age,
-      totalDepreciationPercent: result.total_depreciation_percentage,
-    };
-  }, [tradeValues, data.conditionScore]);
+  // Zustand store actions
+  const {
+    updateFields,
+    recalculate,
+    setTradeValues,
+    setIsLookupComplete,
+    setIsLoading,
+    setIsSubmitting,
+    loadEvaluation,
+  } = useTradeStore();
 
-  // Initial calculation on mount to set Trade-In % based on default margin
+  // Initial calculation on mount
   useEffect(() => {
     recalculate('initial-load');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Recalculate whenever data changes
-  const recalculate = (
-    driverId: DriverId,
-    updates?: Partial<TradeData>,
-    newTradeValues?: TradeValues
-  ) => {
-    const newData = updates ? { ...data, ...updates } : data;
-    const currentTradeValues = newTradeValues ?? tradeValues;
-
-    if (driverId === 'margin-percent-slider' || driverId === 'initial-load') {
-      const newCalc = calculateValuation(newData, driverId, isLookupComplete, currentTradeValues);
-      const newTradeInPercent = calculateTradeInPercentFromMargin(
-        newCalc.totalUnitCosts,
-        newCalc.finalTradeOffer
-      );
-
-      setData({ ...newData, tradeInPercent: newTradeInPercent });
-      setCalculated(newCalc);
-    } else {
-      const newCalc = calculateValuation(newData, driverId, isLookupComplete, currentTradeValues);
-
-      if (
-        driverId === 'trade-in-percent-slider' ||
-        driverId === 'condition-score' ||
-        driverId === 'additional-prep-cost' ||
-        driverId === 'avg-listing-price' ||
-        driverId === 'custom-retail-price' ||
-        driverId === 'retail-source' ||
-        driverId === 'rv-type'
-      ) {
-        setData({ ...newData, targetMarginPercent: newCalc.calculatedMarginPercent });
-      } else {
-        setData(newData);
-      }
-
-      setCalculated(newCalc);
-    }
-  };
-
   const handleUpdate = (
-    updates: Partial<TradeData>,
-    driverId: DriverId = 'trade-in-percent-slider'
+    updates: Parameters<typeof updateFields>[0],
+    driverId: Parameters<typeof updateFields>[1] = 'trade-in-percent-slider'
   ) => {
-    const vehicleFieldsChanged =
-      'year' in updates ||
-      'rvType' in updates ||
-      'jdPowerManufacturerId' in updates ||
-      'jdPowerModelTrimId' in updates ||
-      'make' in updates ||
-      'model' in updates;
-
-    if (vehicleFieldsChanged && isLookupComplete) {
-      setIsLookupComplete(false);
-      setTradeValues(undefined);
-    }
-
-    recalculate(driverId, updates);
+    updateFields(updates, driverId);
   };
 
   const handleLookup = async () => {
@@ -213,18 +114,28 @@ export default function TradeForm() {
 
       setTradeValues(newTradeValues);
 
-      const updates: Partial<TradeData> = {
+      // Reset condition-related fields for new valuation + set avgListingPrice
+      const updates = {
         avgListingPrice:
           newTradeValues.bishAdjustedTradeIn > 0
             ? newTradeValues.bishAdjustedTradeIn * 1.15
             : data.avgListingPrice,
+        // Reset fields that should not persist between valuations
+        conditionScore: DEFAULT_CONDITION_SCORE,
+        majorIssues: '',
+        unitAddOns: '',
+        additionalPrepCost: 0,
+        valuationNotes: '',
+        targetMarginPercent: TARGET_MARGIN_PERCENT,
+        retailPriceSource: 'jdpower' as const,
+        customRetailValue: 0,
       };
 
       recalculate('lookup-complete', updates, newTradeValues);
       setIsLookupComplete(true);
     } catch (error) {
       console.error('Lookup error:', error);
-      setIsLookupComplete(true);
+      setIsLookupComplete(false);
     } finally {
       setIsLoading(false);
     }
@@ -308,39 +219,6 @@ export default function TradeForm() {
     }
   };
 
-  const handleLoadEvaluation = (evaluation: TradeEvaluation) => {
-    const loadedData: Partial<TradeData> = {
-      customerName: evaluation.customerName || '',
-      customerPhone: evaluation.customerPhone || '',
-      customerEmail: evaluation.customerEmail || '',
-      stockNumber: evaluation.stockNumber || '',
-      location: evaluation.location || 'BMT',
-      year: evaluation.year,
-      make: evaluation.make || '',
-      model: evaluation.model || '',
-      vin: evaluation.vin || '',
-      rvType: isValidRvType(evaluation.rvType) ? evaluation.rvType : 'FW',
-      mileage: evaluation.mileage,
-      jdPowerManufacturerId: evaluation.jdPowerManufacturerId,
-      jdPowerModelTrimId: evaluation.jdPowerModelTrimId,
-      conditionScore: evaluation.conditionScore || 8,
-      majorIssues: evaluation.majorIssues || '',
-      unitAddOns: evaluation.unitAddOns || '',
-      additionalPrepCost: evaluation.additionalPrepCost ? parseFloat(evaluation.additionalPrepCost) : 0,
-      avgListingPrice: evaluation.avgListingPrice ? parseFloat(evaluation.avgListingPrice) : 0,
-      tradeInPercent: evaluation.tradeInPercent ? parseFloat(evaluation.tradeInPercent) : 1.0,
-      targetMarginPercent: evaluation.targetMarginPercent ? parseFloat(evaluation.targetMarginPercent) : TARGET_MARGIN_PERCENT,
-      retailPriceSource: (evaluation.retailPriceSource as 'jdpower' | 'custom') || 'jdpower',
-      customRetailValue: evaluation.customRetailValue ? parseFloat(evaluation.customRetailValue) : 0,
-      valuationNotes: evaluation.valuationNotes || '',
-    };
-
-    setData((prev) => ({ ...prev, ...loadedData }));
-    setIsLookupComplete(false);
-    setTradeValues(undefined);
-    recalculate('initial-load', loadedData);
-  };
-
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-2">
       {/* 3-Column Grid for Sections 1, 2, 3 */}
@@ -354,7 +232,7 @@ export default function TradeForm() {
             onLookup={handleLookup}
             isLookupComplete={isLookupComplete}
             isLoading={isLoading}
-            onLoadEvaluation={handleLoadEvaluation}
+            onLoadEvaluation={loadEvaluation}
           />
         </div>
 
@@ -407,7 +285,7 @@ export default function TradeForm() {
                 className="resize-none flex-1 min-h-[100px]"
                 placeholder="Negotiations, sign-off, special terms..."
                 value={data.valuationNotes}
-                onChange={(e) => setData({ ...data, valuationNotes: e.target.value })}
+                onChange={(e) => handleUpdate({ valuationNotes: e.target.value })}
                 disabled={!isLookupComplete}
               />
             </div>
@@ -426,11 +304,7 @@ export default function TradeForm() {
                 ? 'trade-in-percent-slider'
                 : updates.targetMarginPercent !== undefined
                   ? 'margin-percent-slider'
-                  : updates.retailSource !== undefined
-                    ? 'retail-source'
-                    : updates.customRetailPrice !== undefined
-                      ? 'custom-retail-price'
-                      : 'trade-in-percent-slider';
+                  : 'trade-in-percent-slider';
             handleUpdate(updates, driverId);
           }}
           isLocked={!isLookupComplete}

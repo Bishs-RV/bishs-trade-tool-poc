@@ -1,8 +1,8 @@
 import { TradeData, CalculatedValues } from './types';
 import {
-  SOLD_PREP_FIXED,
-  MOCK_COMP_DATA,
   getPrepCostTier,
+  DEFAULT_TRADE_IN_PERCENT,
+  TRADE_IN_PERCENT_MAX,
 } from './constants';
 import type { TradeValueResult } from './bishconnect/client';
 
@@ -13,8 +13,6 @@ export type DriverId =
   | 'condition-score'
   | 'avg-listing-price'
   | 'additional-prep-cost'
-  | 'custom-retail-price'
-  | 'retail-source'
   | 'initial-load'
   | 'lookup-complete';
 
@@ -39,7 +37,7 @@ export function calculateValuation(
     bishAdjustedTradeIn: 0,
     pdiCost: 0,
     reconCost: 0,
-    soldPrepCost: SOLD_PREP_FIXED,
+    soldPrepCost: 0,
     totalPrepCosts: 0,
     bishTIVBase: 0,
     totalUnitCosts: 0,
@@ -52,27 +50,14 @@ export function calculateValuation(
     calculatedMarginPercent: 0,
   };
 
-  // Calculate Average Comp Price
-  if (MOCK_COMP_DATA.length > 0) {
-    const totalComp = MOCK_COMP_DATA.reduce((sum, comp) => sum + comp.price, 0);
-    calculated.avgCompPrice = totalComp / MOCK_COMP_DATA.length;
-  }
+  // Calculate Bish's Likely Retail Price from average listing price
+  calculated.calculatedRetailPrice = data.avgListingPrice > 0
+    ? data.avgListingPrice
+    : 40000;
 
-  // Calculate Bish's Likely Retail Price (weighted average)
-  const compWeight = MOCK_COMP_DATA.length > 0 ? 0.6 : 0;
-  const alpWeight = 0.4;
-  calculated.calculatedRetailPrice =
-    (calculated.avgCompPrice * compWeight) + (data.avgListingPrice * alpWeight);
-
-  // Default to 40000 if too low
-  if (calculated.calculatedRetailPrice < 1000) {
-    calculated.calculatedRetailPrice = 40000;
-  }
-
-  // Replacement Cost: Mocked to $40,500 on successful lookup
-  if (isLookupComplete) {
-    calculated.replacementCost = 40500;
-  }
+  // Replacement Cost: Not yet implemented (requires inventory data)
+  // TODO: Integrate with inventory system to get actual replacement cost
+  calculated.replacementCost = 0;
 
   // Trade values from API
   calculated.jdPowerTradeIn = tradeValues?.jdPowerTradeIn ?? 0;
@@ -127,9 +112,6 @@ export function calculateValuation(
     'condition-score',
     'avg-listing-price',
     'additional-prep-cost',
-    'custom-retail-price',
-    'retail-source',
-    'lookup-complete',
   ];
 
   if (driversForTradeInPercentRecalc.includes(driverId)) {
@@ -137,7 +119,7 @@ export function calculateValuation(
     // Final Trade Offer = Trade-In % * Total Unit Costs
     finalTradeOffer = calculated.totalUnitCosts * data.tradeInPercent;
 
-  } else if (driverId === 'margin-percent-slider' || driverId === 'initial-load') {
+  } else if (driverId === 'margin-percent-slider' || driverId === 'initial-load' || driverId === 'lookup-complete') {
     // Scenario 2: User adjusts Target Margin % (Relative to Active Retail Price) OR Initial Load
     const targetMarginAmount = calculated.activeRetailPrice * data.targetMarginPercent;
 
@@ -163,9 +145,10 @@ export function calculateTradeInPercentFromMargin(
   totalUnitCosts: number,
   finalTradeOffer: number
 ): number {
-  if (totalUnitCosts <= 0) return 1.0;
+  if (totalUnitCosts <= 0) return DEFAULT_TRADE_IN_PERCENT;
   const percent = finalTradeOffer / totalUnitCosts;
-  return Math.min(1.5, Math.max(0, percent));
+  // Allow up to 150% (TRADE_IN_PERCENT_MAX + 20% buffer for margin-driven calculations)
+  return Math.min(TRADE_IN_PERCENT_MAX + 0.2, Math.max(0, percent));
 }
 
 /**

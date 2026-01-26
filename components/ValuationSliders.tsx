@@ -1,7 +1,13 @@
 'use client';
 
 import { formatPercent } from '@/lib/calculations';
-import { TARGET_MARGIN_PERCENT } from '@/lib/constants';
+import {
+  TARGET_MARGIN_PERCENT,
+  TRADE_IN_PERCENT_MIN,
+  TRADE_IN_PERCENT_MAX,
+  MARGIN_PERCENT_MIN,
+  MARGIN_PERCENT_MAX,
+} from '@/lib/constants';
 import { Slider } from '@/components/ui/slider';
 import { Field, FieldLabel } from '@/components/ui/field';
 
@@ -25,8 +31,8 @@ export default function ValuationSliders({
             Trade-In Offer as % of Total Unit Costs
           </FieldLabel>
           <Slider
-            min={70}
-            max={130}
+            min={TRADE_IN_PERCENT_MIN * 100}
+            max={TRADE_IN_PERCENT_MAX * 100}
             step={1}
             value={[tradeInPercent * 100]}
             onValueChange={(values) => {
@@ -36,11 +42,11 @@ export default function ValuationSliders({
           />
         </Field>
         <div className="flex justify-between text-sm font-semibold pt-0.5">
-          <span className="text-gray-500 text-xs">70% (Low)</span>
+          <span className="text-gray-500 text-xs">{formatPercent(TRADE_IN_PERCENT_MIN)} (Low)</span>
           <span className="text-blue-900">
             <span className="text-lg font-extrabold">{formatPercent(tradeInPercent)}</span>
           </span>
-          <span className="text-gray-500 text-sm">130% (High)</span>
+          <span className="text-gray-500 text-sm">{formatPercent(TRADE_IN_PERCENT_MAX)} (High)</span>
         </div>
       </div>
 
@@ -56,7 +62,7 @@ export default function ValuationSliders({
             {/* Target tick mark positioned above slider */}
             <div
               className="absolute bottom-full mb-1 pointer-events-none"
-              style={{ left: '75%', transform: 'translateX(-50%)' }}
+              style={{ left: `${(TARGET_MARGIN_PERCENT / MARGIN_PERCENT_MAX) * 100}%`, transform: 'translateX(-50%)' }}
             >
               <span className="block text-xs font-bold text-green-600 whitespace-nowrap text-center">
                 {formatPercent(TARGET_MARGIN_PERCENT)} Target
@@ -65,8 +71,8 @@ export default function ValuationSliders({
             </div>
 
             <Slider
-              min={0}
-              max={40}
+              min={MARGIN_PERCENT_MIN * 100}
+              max={MARGIN_PERCENT_MAX * 100}
               step={0.5}
               value={[targetMarginPercent * 100]}
               onValueChange={(values) => {
@@ -77,11 +83,11 @@ export default function ValuationSliders({
         </Field>
 
         <div className="flex justify-between text-sm font-semibold pt-0.5">
-          <span className="text-gray-500 text-xs">0% (Break Even)</span>
+          <span className="text-gray-500 text-xs">{formatPercent(MARGIN_PERCENT_MIN)} (Break Even)</span>
           <span className="text-blue-900">
             <span className="text-lg font-extrabold">{formatPercent(targetMarginPercent)}</span>
           </span>
-          <span className="text-gray-500 text-xs">40%</span>
+          <span className="text-gray-500 text-xs">{formatPercent(MARGIN_PERCENT_MAX)}</span>
         </div>
       </div>
     </div>
