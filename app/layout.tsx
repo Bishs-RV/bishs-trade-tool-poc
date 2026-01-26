@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { MockAuthProvider } from "@bishs-rv/bishs-global-header";
 import "@bishs-rv/bishs-global-header/styles";
 import "./globals.css";
+import { Providers } from "./providers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,7 +30,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <MockAuthProvider>{children}</MockAuthProvider>
+        <MockAuthProvider>
+          <Providers>{children}</Providers>
+        </MockAuthProvider>
       </body>
     </html>
   );

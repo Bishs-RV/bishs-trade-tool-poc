@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useSession } from 'next-auth/react';
+import { useMockAuth } from '@bishs-rv/bishs-global-header';
 import { TradeData, CalculatedValues, RVType } from '@/lib/types';
 import type { TradeEvaluation } from '@/lib/db/schema';
 import {
@@ -71,6 +73,15 @@ const initialCalculated: CalculatedValues = {
 };
 
 export default function TradeForm() {
+  // Get user from real auth (NextAuth) or fall back to mock auth
+  const { data: session, status } = useSession();
+  const mockAuth = useMockAuth();
+
+  const isRealAuthActive = status === "authenticated" && session?.user;
+  const userName = isRealAuthActive
+    ? (session.user.name ?? "Unknown User")
+    : (mockAuth.user?.name ?? "Test User");
+
   const [isLookupComplete, setIsLookupComplete] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -263,7 +274,7 @@ export default function TradeForm() {
         calculatedMarginAmount: calculated.calculatedMarginAmount,
         calculatedMarginPercent: calculated.calculatedMarginPercent,
         valuationNotes: data.valuationNotes || undefined,
-        createdBy: 'trade-tool-user',
+        createdBy: userName,
       };
 
       const response = await fetch('/api/valuations', {
