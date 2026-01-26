@@ -61,12 +61,13 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const make = searchParams.get('make')
   const model = searchParams.get('model')
+  const manufacturer = searchParams.get('manufacturer')
   const yearStr = searchParams.get('year')
   const yearRangeStr = searchParams.get('yearRange')
 
-  if (!make || !model || !yearStr) {
+  if (!model || !yearStr) {
     return NextResponse.json(
-      { error: 'make, model, and year are required' },
+      { error: 'model and year are required' },
       { status: 400 }
     )
   }
@@ -86,7 +87,8 @@ export async function GET(request: NextRequest) {
 
   const minYear = year - yearRange
   const maxYear = year + yearRange
-  const makePattern = buildFuzzyPattern(make)
+  const makePattern = make ? buildFuzzyPattern(make) : null
+  const manufacturerPattern = manufacturer ? buildFuzzyPattern(manufacturer) : null
   const modelPattern = buildModelPattern(model)
 
   try {
@@ -114,7 +116,8 @@ export async function GET(request: NextRequest) {
       )
       .where(
         and(
-          ilike(evoMajorunit.make, makePattern),
+          makePattern ? ilike(evoMajorunit.make, makePattern) : undefined,
+          manufacturerPattern ? ilike(evoMajorunit.manufacturer, manufacturerPattern) : undefined,
           sql`LOWER(REGEXP_REPLACE(${evoMajorunit.model}, '[^a-zA-Z0-9]', '', 'g')) LIKE ${modelPattern}`,
           gte(evoMajorunit.modelYear, minYear),
           lte(evoMajorunit.modelYear, maxYear),
@@ -152,7 +155,8 @@ export async function GET(request: NextRequest) {
       )
       .where(
         and(
-          ilike(evoSalesdealdetailunits.make, makePattern),
+          makePattern ? ilike(evoSalesdealdetailunits.make, makePattern) : undefined,
+          manufacturerPattern ? ilike(evoSalesdealdetailunits.manufacturer, manufacturerPattern) : undefined,
           sql`LOWER(REGEXP_REPLACE(${evoSalesdealdetailunits.model}, '[^a-zA-Z0-9]', '', 'g')) LIKE ${modelPattern}`,
           gte(sql`CAST(${evoSalesdealdetailunits.year} AS INTEGER)`, minYear),
           lte(sql`CAST(${evoSalesdealdetailunits.year} AS INTEGER)`, maxYear),

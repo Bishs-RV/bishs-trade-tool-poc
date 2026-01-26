@@ -32,7 +32,7 @@ export default function Section3Market({
   const [error, setError] = useState<string | null>(null)
 
   const fetchComparables = useCallback(async () => {
-    if (!data.make || !data.model || !data.year) {
+    if (!data.model || !data.year) {
       setListedUnits([])
       setSoldUnits([])
       setMetrics(EMPTY_METRICS)
@@ -44,10 +44,15 @@ export default function Section3Market({
 
     try {
       const params = new URLSearchParams({
-        make: data.make,
         model: data.model,
         year: data.year.toString(),
       })
+      if (data.make) {
+        params.set('make', data.make)
+      }
+      if (data.manufacturerName) {
+        params.set('manufacturer', data.manufacturerName)
+      }
 
       const response = await fetch(`/api/comparables?${params}`)
       if (!response.ok) {
@@ -66,7 +71,7 @@ export default function Section3Market({
     } finally {
       setIsLoading(false)
     }
-  }, [data.make, data.model, data.year])
+  }, [data.make, data.manufacturerName, data.model, data.year])
 
   useEffect(() => {
     if (!isLocked) {
