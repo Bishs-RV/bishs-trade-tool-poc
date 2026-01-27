@@ -22,6 +22,7 @@ export const RV_TYPE_TO_CATEGORY: Record<RVType, JDPowerCategoryId> = {
   CAD: JD_POWER_CATEGORIES.MOTORHOMES, // Class A Diesel
   CCG: JD_POWER_CATEGORIES.MOTORHOMES, // Class C Gas
   CCD: JD_POWER_CATEGORIES.MOTORHOMES, // Class C Diesel
+  DT: JD_POWER_CATEGORIES.PARK_MODELS, // Destination Trailer -> Park Models (category 5)
 }
 
 // Display names for JD Power categories

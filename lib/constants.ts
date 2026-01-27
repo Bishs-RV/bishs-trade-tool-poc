@@ -1,16 +1,4 @@
-import { RVType, ComparableUnit } from './types';
-
-// PDI Cost mapping by RV Type - DEPRECATED, now using pricing tiers
-export const RV_PDI_MAP: Record<RVType, number> = {
-  'TT': 800,
-  'POP': 800,
-  'FW': 1200,
-  'TC': 1200,
-  'CCG': 1500,
-  'CCD': 1500,
-  'CAG': 2500,
-  'CAD': 2500,
-};
+import { RVType } from './types';
 
 // Prep cost tiers based on JD Power Trade-In value
 export interface PrepCostTier {
@@ -42,57 +30,30 @@ export const PREP_COST_TIERS: PrepCostTier[] = [
 ];
 
 // Helper function to get prep cost tier based on JD Power Trade-In value
-// Uses "greater than" logic: find the highest tier ceiling the value exceeds
-// Example: $20,700 > $20,000 ceiling → use the $20,000 tier ($187.50 recon)
+// Finds the tier where value falls within the range (0-ceiling)
+// Example: $20,700 falls within 20-25k range → use the $25,000 tier
 export function getPrepCostTier(jdPowerTradeIn: number): PrepCostTier {
-  // Work backwards to find the highest ceiling the value exceeds
-  for (let i = PREP_COST_TIERS.length - 1; i >= 0; i--) {
-    if (jdPowerTradeIn > PREP_COST_TIERS[i].ceiling) {
-      return PREP_COST_TIERS[i];
+  for (const tier of PREP_COST_TIERS) {
+    if (jdPowerTradeIn <= tier.ceiling) {
+      return tier;
     }
   }
-  // Value doesn't exceed any ceiling, return first tier
-  return PREP_COST_TIERS[0];
+  // Value exceeds all ceilings, return highest tier
+  return PREP_COST_TIERS[PREP_COST_TIERS.length - 1];
 }
-
-// Fixed cost constants
-export const RECON_FIXED_BASE = 2000;
-export const SOLD_PREP_FIXED = 1000;
-export const RECON_PENALTY_PER_POINT = 500;
-export const MAX_CONDITION_SCORE = 9;
 
 // Slider ranges
 export const TRADE_IN_PERCENT_MIN = 0.70;
 export const TRADE_IN_PERCENT_MAX = 1.30;
 export const MARGIN_PERCENT_MIN = 0;
 export const MARGIN_PERCENT_MAX = 0.40;
-export const TARGET_MARGIN_PERCENT = 0.18;
+export const TARGET_MARGIN_PERCENT = 0.30;
+export const DEFAULT_TRADE_IN_PERCENT = 1.0;
 
-// Location options
-export const LOCATIONS = [
-  'AIN', 'AUT', 'BMT', 'CAL', 'CIA', 'CMI', 'CORP', 'CWY', 'DIA', 'GMT',
-  'IDF', 'JOR', 'KMT', 'KNE', 'LMI', 'LNE', 'LTX', 'MID', 'MSV', 'ONE',
-  'SUT', 'TMI', 'TWF', 'ZMT'
-];
-
-// Mock comparable data
-export const MOCK_COMP_DATA: ComparableUnit[] = [
-  { price: 50000, dealership: "Bish's RV", url: "https://example.com/listing/mid-50000", location: "MID", listedPrice: 50000, soldPrice: 48500, soldDate: "2024-11-15" },
-  { price: 48000, dealership: "Bish's RV", url: "https://example.com/listing/idf-48000", location: "IDF", listedPrice: 48000 },
-  { price: 53000, dealership: "Bish's RV", url: "https://example.com/listing/twf-53000", location: "TWF", listedPrice: 53000, soldPrice: 51200, soldDate: "2024-11-20" },
-  { price: 51500, dealership: "Bish's RV", url: "https://example.com/listing/bmt-51500", location: "BMT", listedPrice: 51500 },
-  { price: 49900, dealership: "Bish's RV", url: "https://example.com/listing/zmt-49900", location: "ZMT", listedPrice: 49900, soldPrice: 49000, soldDate: "2024-11-18" },
-  { price: 52500, dealership: "Bish's RV", url: "https://example.com/listing/jor-52500", location: "JOR", listedPrice: 52500 },
-  { price: 47500, dealership: "Bish's RV", url: "https://example.com/listing/mid-47500", location: "MID", listedPrice: 47500, soldPrice: 46800, soldDate: "2024-11-12" },
-  { price: 50500, dealership: "Bish's RV", url: "https://example.com/listing/idf-50500", location: "IDF", listedPrice: 50500 },
-  { price: 54000, dealership: "Bish's RV", url: "https://example.com/listing/twf-54000", location: "TWF", listedPrice: 54000, soldPrice: 52800, soldDate: "2024-11-22" },
-  { price: 49000, dealership: "Bish's RV", url: "https://example.com/listing/bmt-49000", location: "BMT", listedPrice: 49000 },
-  { price: 51000, dealership: "Bish's RV", url: "https://example.com/listing/zmt-51000", location: "ZMT", listedPrice: 51000, soldPrice: 50200, soldDate: "2024-11-25" },
-  { price: 53500, dealership: "Bish's RV", url: "https://example.com/listing/jor-53500", location: "JOR", listedPrice: 53500 },
-  { price: 46500, dealership: "Bish's RV", url: "https://example.com/listing/mid-46500", location: "MID", listedPrice: 46500, soldPrice: 45900, soldDate: "2024-11-10" },
-  { price: 50000, dealership: "Bish's RV", url: "https://example.com/listing/idf-50000", location: "IDF", listedPrice: 50000 },
-  { price: 52000, dealership: "Bish's RV", url: "https://example.com/listing/twf-52000", location: "TWF", listedPrice: 52000, soldPrice: 51000, soldDate: "2024-11-28" },
-];
+// Form defaults
+export const DEFAULT_LOCATION = 'MID';
+export const DEFAULT_RV_TYPE: RVType = 'TT';
+export const DEFAULT_CONDITION_SCORE = 7;
 
 // RV Type options
 export const RV_TYPE_OPTIONS: Array<{ value: RVType; label: string }> = [
@@ -104,78 +65,7 @@ export const RV_TYPE_OPTIONS: Array<{ value: RVType; label: string }> = [
   { value: 'CAD', label: 'Class A-D' },
   { value: 'CCG', label: 'Class C-G' },
   { value: 'CCD', label: 'Class C-D' },
-];
-
-// RV Make options
-export const RV_MAKES = [
-  'Airstream',
-  'Coachmen',
-  'Dutchmen',
-  'Forest River',
-  'Grand Design',
-  'Heartland',
-  'Jayco',
-  'Keystone',
-  'KZ',
-  'Newmar',
-  'Northwood',
-  'Palomino',
-  'Thor Motor Coach',
-  'Tiffin',
-  'Winnebago',
-];
-
-// RV Model/Floorplan options (organized by popular manufacturers)
-export const RV_MODELS = [
-  // Airstream
-  'Classic',
-  'Flying Cloud',
-  'Bambi',
-  'Basecamp',
-  // Forest River
-  'Rockwood Ultra Lite',
-  'Wildwood',
-  'Salem',
-  'Georgetown',
-  'Sunseeker',
-  // Grand Design
-  'Reflection',
-  'Imagine',
-  'Transcend',
-  'Momentum',
-  // Jayco
-  'Jay Flight',
-  'Eagle',
-  'White Hawk',
-  'Greyhawk',
-  'Redhawk',
-  // Keystone
-  'Cougar',
-  'Outback',
-  'Passport',
-  'Montana',
-  'Sprinter',
-  // Thor Motor Coach
-  'Ace',
-  'Challenger',
-  'Quantum',
-  'Four Winds',
-  // Winnebago
-  'Minnie Winnie',
-  'Vista',
-  'Voyage',
-  'Micro Minnie',
-  'Solis',
-  // Other popular models
-  'Avalanche',
-  'Cherokee',
-  'Durango',
-  'Flagstaff',
-  'Freelander',
-  'Laredo',
-  'Puma',
-  'Raptor',
-  'Vengeance',
+  { value: 'DT', label: 'Destination Trailer' },
 ];
 
 // Helper function to check if RV type is motorized

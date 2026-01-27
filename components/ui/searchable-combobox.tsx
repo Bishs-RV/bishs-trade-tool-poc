@@ -77,7 +77,7 @@ export function SearchableCombobox({
   const isCustomValue = value?.startsWith('custom:') ?? false;
   const currentLabel = isCustomValue && value
     ? value.replace('custom:', '')
-    : options?.find((item) => item.value === value)?.label ?? value;
+    : options?.find((item) => item.value === value)?.label ?? null;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

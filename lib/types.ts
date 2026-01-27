@@ -41,8 +41,6 @@ export interface TradeData {
   // Section 4: Valuation Levers
   tradeInPercent: number; // 0.70 to 1.30
   targetMarginPercent: number; // 0 to 0.40
-  retailSource: 'bish' | 'custom'; // For replacement cost (legacy, will be removed)
-  customRetailPrice: number; // For replacement cost (legacy, will be removed)
   retailPriceSource: 'jdpower' | 'custom'; // For retail price calculation
   customRetailValue: number; // Custom retail price value
   
@@ -50,16 +48,12 @@ export interface TradeData {
   valuationNotes: string;
 }
 
-export type RVType = 'TT' | 'FW' | 'POP' | 'TC' | 'CAG' | 'CAD' | 'CCG' | 'CCD';
+export type RVType = 'TT' | 'FW' | 'POP' | 'TC' | 'CAG' | 'CAD' | 'CCG' | 'CCD' | 'DT';
 
-export interface ComparableUnit {
-  price: number; // Original asking price or comparable price
-  dealership: string;
-  url: string;
-  location: string;
-  listedPrice?: number; // Bish's listed price (if applicable)
-  soldPrice?: number; // Bish's sold price (if sold)
-  soldDate?: string; // Date sold (if sold)
+export interface DepreciationInfo {
+  monthsToSell?: number;
+  vehicleAge?: number;
+  totalDepreciationPercent?: number;
 }
 
 export interface CalculatedValues {

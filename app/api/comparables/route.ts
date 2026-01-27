@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { evoMajorunit, evoSalesdealdetail, evoSalesdealdetailunits } from '@/lib/db/schema'
+import { evoMajorunit, evoSalesdealdetail, evoSalesdealdetailunits, locationDetail } from '@/lib/db/schema'
 import { and, eq, gte, lte, ilike, sql, or, isNotNull } from 'drizzle-orm'
 import type { ComparablesResponse, HistoricalComparable } from '@/lib/types/comparables'
 
@@ -61,12 +61,13 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const make = searchParams.get('make')
   const model = searchParams.get('model')
+  const manufacturer = searchParams.get('manufacturer')
   const yearStr = searchParams.get('year')
   const yearRangeStr = searchParams.get('yearRange')
 
-  if (!make || !model || !yearStr) {
+  if (!model || !yearStr) {
     return NextResponse.json(
-      { error: 'make, model, and year are required' },
+      { error: 'model and year are required' },
       { status: 400 }
     )
   }
@@ -86,12 +87,14 @@ export async function GET(request: NextRequest) {
 
   const minYear = year - yearRange
   const maxYear = year + yearRange
-  const makePattern = buildFuzzyPattern(make)
+  const makePattern = make ? buildFuzzyPattern(make) : null
+  const manufacturerPattern = manufacturer ? buildFuzzyPattern(manufacturer) : null
   const modelPattern = buildModelPattern(model)
 
   try {
     // Use REGEXP_REPLACE to normalize DB values for comparison
     // This allows "M-19" in DB to match pattern "%m19%"
+    // Join to location_detail to get proper location code from Cmf_id
     const listedUnitsRaw = await db
       .select({
         id: evoMajorunit.majorUnitHeaderId,
@@ -99,7 +102,7 @@ export async function GET(request: NextRequest) {
         model: evoMajorunit.model,
         year: evoMajorunit.modelYear,
         manufacturer: evoMajorunit.manufacturer,
-        location: evoMajorunit.storeLocation,
+        location: locationDetail.location,
         webPrice: evoMajorunit.webPrice,
         dsrp: evoMajorunit.dsrp,
         listingDate: evoMajorunit.dateReceived,
@@ -107,9 +110,14 @@ export async function GET(request: NextRequest) {
         vin: evoMajorunit.vin,
       })
       .from(evoMajorunit)
+      .leftJoin(
+        locationDetail,
+        sql`CAST(${evoMajorunit.cmfId} AS INTEGER) = ${locationDetail.cmf}`
+      )
       .where(
         and(
-          ilike(evoMajorunit.make, makePattern),
+          makePattern ? ilike(evoMajorunit.make, makePattern) : undefined,
+          manufacturerPattern ? ilike(evoMajorunit.manufacturer, manufacturerPattern) : undefined,
           sql`LOWER(REGEXP_REPLACE(${evoMajorunit.model}, '[^a-zA-Z0-9]', '', 'g')) LIKE ${modelPattern}`,
           gte(evoMajorunit.modelYear, minYear),
           lte(evoMajorunit.modelYear, maxYear),
@@ -119,6 +127,7 @@ export async function GET(request: NextRequest) {
       .limit(MAX_RESULTS)
 
     // Query 1: Sold units from deal details (has soldPrice, daysInStore, soldDate)
+    // Join to location_detail to get proper location code from cmfId
     const soldFromDealsRaw = await db
       .select({
         id: evoSalesdealdetailunits.dealUnitId,
@@ -132,17 +141,22 @@ export async function GET(request: NextRequest) {
         stockNumber: evoSalesdealdetailunits.stocknumber,
         vin: evoSalesdealdetailunits.vin,
         salesDealId: evoSalesdealdetailunits.salesDealId,
-        cmfId: evoSalesdealdetail.cmfId,
         soldDate: evoSalesdealdetail.deliveryDate,
+        location: locationDetail.location,
       })
       .from(evoSalesdealdetailunits)
       .innerJoin(
         evoSalesdealdetail,
         eq(evoSalesdealdetailunits.salesDealId, evoSalesdealdetail.dealNoCmf)
       )
+      .leftJoin(
+        locationDetail,
+        sql`CAST(${evoSalesdealdetail.cmfId} AS INTEGER) = ${locationDetail.cmf}`
+      )
       .where(
         and(
-          ilike(evoSalesdealdetailunits.make, makePattern),
+          makePattern ? ilike(evoSalesdealdetailunits.make, makePattern) : undefined,
+          manufacturerPattern ? ilike(evoSalesdealdetailunits.manufacturer, manufacturerPattern) : undefined,
           sql`LOWER(REGEXP_REPLACE(${evoSalesdealdetailunits.model}, '[^a-zA-Z0-9]', '', 'g')) LIKE ${modelPattern}`,
           gte(sql`CAST(${evoSalesdealdetailunits.year} AS INTEGER)`, minYear),
           lte(sql`CAST(${evoSalesdealdetailunits.year} AS INTEGER)`, maxYear),
@@ -176,7 +190,7 @@ export async function GET(request: NextRequest) {
       model: unit.model,
       year: parseYearSafely(unit.year),
       manufacturer: unit.manufacturer,
-      location: unit.cmfId,
+      location: unit.location,
       listedPrice: null,
       soldPrice: parseNumericSafely(unit.soldPrice),
       soldDate: unit.soldDate,
