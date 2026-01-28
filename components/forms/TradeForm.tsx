@@ -14,12 +14,9 @@ import {
   useIsLoading,
   useIsSubmitting,
   useDepreciation,
+  useEvaluationCreatedBy,
+  useEvaluationCreatedDate,
 } from '@/lib/store';
-import {
-  DEFAULT_CONDITION_SCORE,
-  TARGET_MARGIN_PERCENT,
-  DEFAULT_ADDITIONAL_PREP_COST,
-} from '@/lib/constants';
 import Section1UnitData from '@/components/Section1UnitData';
 import Section2Condition from '@/components/Section2Condition';
 import Section3Market from '@/components/Section3Market';
@@ -45,12 +42,20 @@ export default function TradeForm() {
   const isLoading = useIsLoading();
   const isSubmitting = useIsSubmitting();
   const depreciation = useDepreciation();
+  const evaluationCreatedBy = useEvaluationCreatedBy();
+  const evaluationCreatedDate = useEvaluationCreatedDate();
+
+  // Get current user name from session or mock auth
+  const currentUserName = isRealAuthActive
+    ? (session.user.name ?? undefined)
+    : (mockAuth.user?.name ?? undefined);
 
   // Zustand store actions
   const {
     updateField,
     updateFields,
     recalculate,
+    resetForNewValuation,
     setTradeValues,
     setIsLookupComplete,
     setIsLoading,
@@ -143,27 +148,20 @@ export default function TradeForm() {
         valuationResults: result.valuationResults,
       };
 
+      // Set avgListingPrice based on lookup results
+      const avgListingPrice = newTradeValues.bishAdjustedTradeIn > 0
+        ? newTradeValues.bishAdjustedTradeIn * 1.15
+        : data.avgListingPrice;
+
+      // Set trade values and mark lookup complete first
       setTradeValues(newTradeValues);
-
-      // Reset condition-related fields for new valuation + set avgListingPrice
-      const updates = {
-        avgListingPrice:
-          newTradeValues.bishAdjustedTradeIn > 0
-            ? newTradeValues.bishAdjustedTradeIn * 1.15
-            : data.avgListingPrice,
-        // Reset fields that should not persist between valuations
-        conditionScore: DEFAULT_CONDITION_SCORE,
-        majorIssues: '',
-        unitAddOns: '',
-        additionalPrepCost: DEFAULT_ADDITIONAL_PREP_COST,
-        valuationNotes: '',
-        targetMarginPercent: TARGET_MARGIN_PERCENT,
-        retailPriceSource: 'jdpower' as const,
-        customRetailValue: 0,
-      };
-
-      recalculate('lookup-complete', updates, newTradeValues);
       setIsLookupComplete(true);
+
+      // Reset condition fields to defaults and clear evaluation metadata
+      resetForNewValuation();
+
+      // Update avgListingPrice separately (calculated from lookup results)
+      updateField('avgListingPrice', avgListingPrice);
     } catch (error) {
       console.error('Lookup error:', error);
       setIsLookupComplete(false);
@@ -352,6 +350,9 @@ export default function TradeForm() {
             handleUpdate(updates, driverId);
           }}
           isLocked={!isLookupComplete}
+          currentUserName={currentUserName}
+          createdBy={evaluationCreatedBy}
+          createdDate={evaluationCreatedDate}
         />
       </div>
 
@@ -362,6 +363,9 @@ export default function TradeForm() {
         data={data}
         calculated={calculated}
         depreciation={depreciation}
+        currentUserName={currentUserName}
+        createdBy={evaluationCreatedBy}
+        createdDate={evaluationCreatedDate}
       />
 
       {/* Success Dialog */}

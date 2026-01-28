@@ -81,6 +81,9 @@ interface TradeState {
   isSubmitting: boolean;
   // Flag to suppress cascading resets when loading a prior evaluation
   isLoadingPriorEval: boolean;
+  // Metadata from loaded evaluation (undefined for new evaluations)
+  evaluationCreatedBy: string | undefined;
+  evaluationCreatedDate: Date | undefined;
 }
 
 interface TradeActions {
@@ -123,6 +126,8 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
   isLoading: false,
   isSubmitting: false,
   isLoadingPriorEval: false,
+  evaluationCreatedBy: undefined,
+  evaluationCreatedDate: undefined,
 
   // Actions
   updateField: (field, value, driverId = 'trade-in-percent-slider') => {
@@ -293,6 +298,8 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
     set({
       data: { ...newData, tradeInPercent: newTradeInPercent },
       calculated: newCalc,
+      evaluationCreatedBy: undefined,
+      evaluationCreatedDate: undefined,
     });
   },
 
@@ -411,6 +418,8 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
       calculated: loadedCalc,
       isLookupComplete: true, // Mark as complete so UI shows full state
       tradeValues: loadedTradeValues,
+      evaluationCreatedBy: evaluation.createdBy,
+      evaluationCreatedDate: evaluation.createdDate,
     });
 
     // Clear the flag after effects have run
@@ -434,6 +443,8 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
       isLoading: false,
       isSubmitting: false,
       isLoadingPriorEval: false,
+      evaluationCreatedBy: undefined,
+      evaluationCreatedDate: undefined,
     });
   },
 }));
@@ -446,6 +457,8 @@ export const useIsLoading = () => useTradeStore((state) => state.isLoading);
 export const useIsSubmitting = () => useTradeStore((state) => state.isSubmitting);
 export const useTradeValues = () => useTradeStore((state) => state.tradeValues);
 export const useIsLoadingPriorEval = () => useTradeStore((state) => state.isLoadingPriorEval);
+export const useEvaluationCreatedBy = () => useTradeStore((state) => state.evaluationCreatedBy);
+export const useEvaluationCreatedDate = () => useTradeStore((state) => state.evaluationCreatedDate);
 
 // Derived selectors
 export const useDepreciation = () => {

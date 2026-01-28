@@ -18,6 +18,9 @@ interface PDFDownloadButtonProps {
   calculated: CalculatedValues;
   depreciation?: DepreciationInfo;
   disabled?: boolean;
+  currentUserName?: string;
+  createdBy?: string;
+  createdDate?: Date;
 }
 
 export function PDFDownloadButton({
@@ -25,6 +28,9 @@ export function PDFDownloadButton({
   calculated,
   depreciation,
   disabled = false,
+  currentUserName,
+  createdBy,
+  createdDate,
 }: PDFDownloadButtonProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -32,25 +38,44 @@ export function PDFDownloadButton({
 
   const handleGeneratePDF = async () => {
     setIsGenerating(true);
-    const generatedDate = new Date();
+    const generatedDate = createdDate ? new Date(createdDate) : new Date();
 
     try {
+      // Look up creator's name for loaded evaluations
+      let userName: string | undefined;
+      if (createdBy) {
+        try {
+          const res = await fetch(`/api/user/lookup?email=${encodeURIComponent(createdBy)}`);
+          if (!res.ok) throw new Error('Lookup failed');
+          const userData = await res.json();
+          const fullName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim();
+          userName = fullName || createdBy.split('@')[0];
+        } catch (err) {
+          console.error('Failed to lookup user for PDF:', err);
+          userName = createdBy.split('@')[0];
+        }
+      } else {
+        userName = currentUserName;
+      }
+
       const blob = await pdf(
         <TradeEvaluationPDF
           data={data}
           calculated={calculated}
           depreciation={depreciation}
           generatedDate={generatedDate}
+          userName={userName}
+          storeCode={data.location}
         />
       ).toBlob();
 
       const sanitize = (str: string) => str.replace(/[/\\?%*:|"<>]/g, '-');
-      const fullName = `${data.customerFirstName || ''} ${data.customerLastName || ''}`.trim();
+      const customerName = `${data.customerFirstName || ''} ${data.customerLastName || ''}`.trim();
       const unit = `${data.make || ''} ${data.model || ''}`.trim();
       const date = generatedDate.toISOString().split('T')[0];
 
       const generatedFilename = [
-        sanitize(fullName) || 'Customer',
+        sanitize(customerName) || 'Customer',
         sanitize(unit) || 'Unit',
         date,
       ].join(' - ') + '.pdf';
@@ -84,10 +109,6 @@ export function PDFDownloadButton({
     setFilename('');
   };
 
-  const isDisabled = disabled || isGenerating;
-  const icon = isGenerating ? '⏳' : '🖨';
-  const label = isGenerating ? 'Generating...' : 'Generate PDF';
-
   return (
     <>
       <Button
@@ -95,10 +116,10 @@ export function PDFDownloadButton({
         variant="primary"
         size="lg"
         onClick={handleGeneratePDF}
-        disabled={isDisabled}
+        disabled={disabled || isGenerating}
       >
-        <span>{icon}</span>
-        <span>{label}</span>
+        <span>{isGenerating ? '⏳' : '🖨'}</span>
+        <span>{isGenerating ? 'Generating...' : 'Generate PDF'}</span>
       </Button>
 
       <Dialog open={!!pdfUrl} onOpenChange={(open) => !open && handleClose()}>
