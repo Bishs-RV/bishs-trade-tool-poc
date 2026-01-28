@@ -17,6 +17,8 @@ interface TradeEvaluationPDFProps {
   calculated: CalculatedValues;
   depreciation?: DepreciationInfo;
   generatedDate?: Date;
+  userName?: string;
+  storeCode?: string;
 }
 
 const styles = StyleSheet.create({
@@ -152,12 +154,18 @@ export function TradeEvaluationPDF({
   calculated,
   depreciation,
   generatedDate = new Date(),
+  userName,
+  storeCode,
 }: TradeEvaluationPDFProps) {
   const dateStr = generatedDate.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
   });
+
+  // Build metadata string for header/footer
+  const metadataParts = [dateStr, userName, storeCode].filter(Boolean);
+  const metadataStr = metadataParts.join(' | ');
 
   const hasCustomerInfo = !!(data.customerFirstName || data.customerLastName || data.customerPhone || data.customerEmail);
   const customerFullName = [data.customerFirstName, data.customerLastName].filter(Boolean).join(' ');
@@ -169,7 +177,7 @@ export function TradeEvaluationPDF({
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Trade-In Evaluation Summary</Text>
           <Text style={styles.headerSubtitle}>
-            Bish&apos;s RV | Generated: {dateStr}
+            Bish&apos;s RV | {metadataStr}
           </Text>
         </View>
 
@@ -364,8 +372,7 @@ export function TradeEvaluationPDF({
         {/* Footer */}
         <View style={styles.footer} fixed>
           <Text>
-            Bish&apos;s RV | Trade-In Evaluation | Stock: {data.stockNumber || 'N/A'} |
-            Generated: {dateStr}
+            Bish&apos;s RV | Trade-In Evaluation | Stock: {data.stockNumber || 'N/A'} | {metadataStr}
           </Text>
         </View>
       </Page>

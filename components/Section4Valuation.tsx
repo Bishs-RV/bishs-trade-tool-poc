@@ -9,6 +9,9 @@ interface Section4Props {
   calculated: CalculatedValues;
   onUpdate: (updates: Partial<TradeData>) => void;
   isLocked: boolean;
+  currentUserName?: string;
+  createdBy?: string;
+  createdDate?: Date;
 }
 
 export default function Section4Valuation({
@@ -16,6 +19,9 @@ export default function Section4Valuation({
   calculated,
   onUpdate,
   isLocked,
+  currentUserName,
+  createdBy,
+  createdDate,
 }: Section4Props) {
   return (
     <div className="relative">
@@ -56,6 +62,10 @@ export default function Section4Valuation({
           calculatedMarginAmount={calculated.calculatedMarginAmount}
           calculatedMarginPercent={calculated.calculatedMarginPercent}
           onUpdate={onUpdate}
+          currentUserName={currentUserName}
+          location={data.location}
+          createdBy={createdBy}
+          createdDate={createdDate}
         />
       </div>
     </div>

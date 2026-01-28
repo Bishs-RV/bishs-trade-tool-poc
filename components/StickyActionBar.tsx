@@ -10,6 +10,9 @@ interface StickyActionBarProps {
   data: TradeData;
   calculated: CalculatedValues;
   depreciation?: DepreciationInfo;
+  currentUserName?: string;
+  createdBy?: string;
+  createdDate?: Date;
 }
 
 export default function StickyActionBar({
@@ -18,6 +21,9 @@ export default function StickyActionBar({
   data,
   calculated,
   depreciation,
+  currentUserName,
+  createdBy,
+  createdDate,
 }: StickyActionBarProps) {
   if (isLocked) return null;
 
@@ -27,6 +33,9 @@ export default function StickyActionBar({
         data={data}
         calculated={calculated}
         depreciation={depreciation}
+        currentUserName={currentUserName}
+        createdBy={createdBy}
+        createdDate={createdDate}
       />
       <Button
         type="submit"
