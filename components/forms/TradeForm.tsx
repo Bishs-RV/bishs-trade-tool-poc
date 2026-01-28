@@ -34,9 +34,9 @@ export default function TradeForm() {
   const mockAuth = useMockAuth();
 
   const isRealAuthActive = status === "authenticated" && session?.user;
-  const userName = isRealAuthActive
-    ? (session.user.name ?? "Unknown User")
-    : (mockAuth.user?.name ?? "Test User");
+  const userEmail = isRealAuthActive
+    ? (session.user.email ?? "unknown@bishs.com")
+    : (mockAuth.user?.email ?? "test@bishs.com");
 
   // Zustand store state
   const data = useTradeData();
@@ -218,7 +218,7 @@ export default function TradeForm() {
         calculatedMarginAmount: calculated.calculatedMarginAmount,
         calculatedMarginPercent: calculated.calculatedMarginPercent,
         valuationNotes: data.valuationNotes || undefined,
-        createdBy: userName,
+        createdBy: userEmail,
       };
 
       const response = await fetch('/api/valuations', {
