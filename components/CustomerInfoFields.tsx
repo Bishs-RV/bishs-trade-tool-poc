@@ -4,38 +4,56 @@ import { Input } from '@/components/ui/input';
 import { Field, FieldLabel } from '@/components/ui/field';
 
 interface CustomerInfoFieldsProps {
-  customerName: string;
+  customerFirstName: string;
+  customerLastName: string;
   customerPhone: string;
   customerEmail: string;
-  onUpdate: (updates: { customerName?: string; customerPhone?: string; customerEmail?: string }) => void;
+  onUpdate: (updates: {
+    customerFirstName?: string;
+    customerLastName?: string;
+    customerPhone?: string;
+    customerEmail?: string;
+  }) => void;
 }
 
 export default function CustomerInfoFields({
-  customerName,
+  customerFirstName,
+  customerLastName,
   customerPhone,
   customerEmail,
   onUpdate,
 }: CustomerInfoFieldsProps) {
   return (
-    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-xs font-bold text-blue-900 uppercase tracking-wide">Customer Info</h3>
-      </div>
-      <div className="grid grid-cols-3 gap-2">
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-2">
         <Field>
-          <FieldLabel className="text-xs font-semibold text-gray-700">Name</FieldLabel>
+          <FieldLabel className="text-xs font-semibold text-gray-700">First Name</FieldLabel>
           <Input
             type="text"
             className="mt-0.5"
-            value={customerName}
-            onChange={(e) => onUpdate({ customerName: e.target.value })}
+            value={customerFirstName}
+            onChange={(e) => onUpdate({ customerFirstName: e.target.value })}
           />
         </Field>
         <Field>
-          <FieldLabel className="text-xs font-semibold text-gray-700">Phone</FieldLabel>
+          <FieldLabel className="text-xs font-semibold text-gray-700">Last Name</FieldLabel>
+          <Input
+            type="text"
+            className="mt-0.5"
+            value={customerLastName}
+            onChange={(e) => onUpdate({ customerLastName: e.target.value })}
+          />
+        </Field>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <Field>
+          <FieldLabel className="text-xs font-semibold text-gray-700">
+            Phone <span className="text-red-500">*</span>
+          </FieldLabel>
           <Input
             type="tel"
             className="mt-0.5"
+            required
             value={customerPhone}
             onChange={(e) => onUpdate({ customerPhone: e.target.value })}
           />

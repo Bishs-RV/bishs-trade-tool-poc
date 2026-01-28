@@ -4,6 +4,7 @@ import { MockAuthProvider } from "@bishs-rv/bishs-global-header";
 import "@bishs-rv/bishs-global-header/styles";
 import "./globals.css";
 import { Providers } from "./providers";
+import { Toaster } from "@/components/ui/sonner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,6 +34,7 @@ export default function RootLayout({
         <MockAuthProvider>
           <Providers>{children}</Providers>
         </MockAuthProvider>
+        <Toaster position="top-right" richColors />
       </body>
     </html>
   );

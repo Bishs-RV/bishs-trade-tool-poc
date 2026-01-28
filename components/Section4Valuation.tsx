@@ -43,6 +43,7 @@ export default function Section4Valuation({
         <ValuationSliders
           tradeInPercent={data.tradeInPercent}
           targetMarginPercent={data.targetMarginPercent}
+          calculatedMarginPercent={calculated.calculatedMarginPercent}
           onUpdate={onUpdate}
         />
 
@@ -50,8 +51,7 @@ export default function Section4Valuation({
         <FinancialMetricsGrid
           retailPriceSource={data.retailPriceSource}
           customRetailValue={data.customRetailValue}
-          jdPowerRetailValue={calculated.jdPowerRetailValue}
-          replacementCost={calculated.replacementCost}
+          jdPowerRetailValue={calculated.activeRetailPrice}
           finalTradeOffer={calculated.finalTradeOffer}
           calculatedMarginAmount={calculated.calculatedMarginAmount}
           calculatedMarginPercent={calculated.calculatedMarginPercent}

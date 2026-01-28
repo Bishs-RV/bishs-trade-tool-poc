@@ -1,8 +1,9 @@
 // Core data interfaces for the Trade-In Tool
 
 export interface TradeData {
-  // Customer Info (Optional)
-  customerName: string;
+  // Customer Info (Phone required, others optional)
+  customerFirstName: string;
+  customerLastName: string;
   customerPhone: string;
   customerEmail: string;
 

@@ -14,13 +14,15 @@ import {
   DEFAULT_RV_TYPE,
   DEFAULT_CONDITION_SCORE,
   DEFAULT_TRADE_IN_PERCENT,
+  DEFAULT_ADDITIONAL_PREP_COST,
 } from '@/lib/constants';
 
 const isValidRvType = (type: string | null): type is RVType =>
   type !== null && RV_TYPE_OPTIONS.some((opt) => opt.value === type);
 
 const initialData: TradeData = {
-  customerName: '',
+  customerFirstName: '',
+  customerLastName: '',
   customerPhone: '',
   customerEmail: '',
   stockNumber: '',
@@ -38,7 +40,7 @@ const initialData: TradeData = {
   conditionScore: DEFAULT_CONDITION_SCORE,
   majorIssues: '',
   unitAddOns: '',
-  additionalPrepCost: 0,
+  additionalPrepCost: DEFAULT_ADDITIONAL_PREP_COST,
   avgListingPrice: 0,
   tradeInPercent: DEFAULT_TRADE_IN_PERCENT,
   targetMarginPercent: TARGET_MARGIN_PERCENT,
@@ -77,6 +79,8 @@ interface TradeState {
   isLookupComplete: boolean;
   isLoading: boolean;
   isSubmitting: boolean;
+  // Flag to suppress cascading resets when loading a prior evaluation
+  isLoadingPriorEval: boolean;
 }
 
 interface TradeActions {
@@ -118,6 +122,7 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
   isLookupComplete: false,
   isLoading: false,
   isSubmitting: false,
+  isLoadingPriorEval: false,
 
   // Actions
   updateField: (field, value, driverId = 'trade-in-percent-slider') => {
@@ -203,7 +208,7 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
       // Otherwise preserve the default (100%) to avoid setting it to 0
       if (hasRealValues) {
         const newTradeInPercent = calculateTradeInPercentFromMargin(
-          newCalc.totalUnitCosts,
+          newCalc.bishTIVBase,
           newCalc.finalTradeOffer
         );
         set({
@@ -219,21 +224,35 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
           tradeValues: newTradeValues ?? tradeValues,
         });
       }
-    } else {
+    } else if (driverId === 'trade-in-percent-slider') {
+      // Trade-in % slider drives: recalculate margin to match
       const newCalc = calculateValuation(newData, driverId, isLookupComplete, currentTradeValues);
 
-      // Recalculate margin percent for certain drivers, but only when we have real values
-      const driversRecalcMargin: DriverId[] = [
-        'trade-in-percent-slider',
-        'condition-score',
-        'additional-prep-cost',
-        'avg-listing-price',
-        'rv-type',
-      ];
-
-      if (driversRecalcMargin.includes(driverId) && hasRealValues) {
+      if (hasRealValues) {
         set({
           data: { ...newData, targetMarginPercent: newCalc.calculatedMarginPercent },
+          calculated: newCalc,
+          tradeValues: newTradeValues ?? tradeValues,
+        });
+      } else {
+        set({
+          data: newData,
+          calculated: newCalc,
+          tradeValues: newTradeValues ?? tradeValues,
+        });
+      }
+    } else {
+      // All other drivers (condition, prep cost, retail, rv-type):
+      // Use margin-driven formula, then update trade-in % to match
+      const newCalc = calculateValuation(newData, driverId, isLookupComplete, currentTradeValues);
+
+      if (hasRealValues) {
+        const newTradeInPercent = calculateTradeInPercentFromMargin(
+          newCalc.bishTIVBase,
+          newCalc.finalTradeOffer
+        );
+        set({
+          data: { ...newData, tradeInPercent: newTradeInPercent },
           calculated: newCalc,
           tradeValues: newTradeValues ?? tradeValues,
         });
@@ -256,7 +275,7 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
       conditionScore: DEFAULT_CONDITION_SCORE,
       majorIssues: '',
       unitAddOns: '',
-      additionalPrepCost: 0,
+      additionalPrepCost: DEFAULT_ADDITIONAL_PREP_COST,
       valuationNotes: '',
       targetMarginPercent: TARGET_MARGIN_PERCENT,
       tradeInPercent: DEFAULT_TRADE_IN_PERCENT,
@@ -267,7 +286,7 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
     const newData = { ...data, ...resetData };
     const newCalc = calculateValuation(newData, 'initial-load', true, tradeValues);
     const newTradeInPercent = calculateTradeInPercentFromMargin(
-      newCalc.totalUnitCosts,
+      newCalc.bishTIVBase,
       newCalc.finalTradeOffer
     );
 
@@ -314,8 +333,12 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
   },
 
   loadEvaluation: (evaluation) => {
-    const loadedData: Partial<TradeData> = {
-      customerName: evaluation.customerName || '',
+    const parseNum = (val: string | null | undefined) => val ? parseFloat(val) : 0;
+
+    // Load all form data from saved evaluation
+    const loadedData: TradeData = {
+      customerFirstName: evaluation.customerFirstName || '',
+      customerLastName: evaluation.customerLastName || '',
       customerPhone: evaluation.customerPhone || '',
       customerEmail: evaluation.customerEmail || '',
       stockNumber: evaluation.stockNumber || '',
@@ -326,36 +349,80 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
       vin: evaluation.vin || '',
       rvType: isValidRvType(evaluation.rvType) ? evaluation.rvType : DEFAULT_RV_TYPE,
       mileage: evaluation.mileage,
+      originalListPrice: null,
       jdPowerManufacturerId: evaluation.jdPowerManufacturerId,
       jdPowerModelTrimId: evaluation.jdPowerModelTrimId,
+      manufacturerName: '',
       conditionScore: evaluation.conditionScore || DEFAULT_CONDITION_SCORE,
       majorIssues: evaluation.majorIssues || '',
       unitAddOns: evaluation.unitAddOns || '',
-      additionalPrepCost: evaluation.additionalPrepCost ? parseFloat(evaluation.additionalPrepCost) : 0,
-      avgListingPrice: evaluation.avgListingPrice ? parseFloat(evaluation.avgListingPrice) : 0,
+      additionalPrepCost: parseNum(evaluation.additionalPrepCost),
+      avgListingPrice: parseNum(evaluation.avgListingPrice),
       tradeInPercent: evaluation.tradeInPercent ? parseFloat(evaluation.tradeInPercent) : DEFAULT_TRADE_IN_PERCENT,
       targetMarginPercent: evaluation.targetMarginPercent ? parseFloat(evaluation.targetMarginPercent) : TARGET_MARGIN_PERCENT,
       retailPriceSource: (evaluation.retailPriceSource as 'jdpower' | 'custom') || 'jdpower',
-      customRetailValue: evaluation.customRetailValue ? parseFloat(evaluation.customRetailValue) : 0,
+      customRetailValue: parseNum(evaluation.customRetailValue),
       valuationNotes: evaluation.valuationNotes || '',
     };
 
-    const { data } = get();
-    const newData = { ...data, ...loadedData };
-    const newCalc = calculateValuation(newData, 'initial-load', false, undefined);
+    // Load all calculated values directly from saved evaluation - don't recalculate
+    const loadedCalc: CalculatedValues = {
+      jdPowerTradeIn: parseNum(evaluation.jdPowerTradeIn),
+      jdPowerRetailValue: parseNum(evaluation.jdPowerRetailValue),
+      bishAdjustedTradeIn: parseNum(evaluation.bishTivBase), // Use bishTivBase as adjusted value
+      pdiCost: parseNum(evaluation.pdiCost),
+      reconCost: parseNum(evaluation.reconCost),
+      soldPrepCost: parseNum(evaluation.soldPrepCost),
+      totalPrepCosts: parseNum(evaluation.totalPrepCosts),
+      bishTIVBase: parseNum(evaluation.bishTivBase),
+      totalUnitCosts: parseNum(evaluation.totalUnitCosts),
+      avgCompPrice: parseNum(evaluation.avgCompPrice),
+      calculatedRetailPrice: parseNum(evaluation.calculatedRetailPrice),
+      replacementCost: parseNum(evaluation.replacementCost),
+      activeRetailPrice: parseNum(evaluation.activeRetailPrice),
+      finalTradeOffer: parseNum(evaluation.finalTradeOffer),
+      calculatedMarginAmount: parseNum(evaluation.calculatedMarginAmount),
+      calculatedMarginPercent: parseNum(evaluation.calculatedMarginPercent),
+    };
 
+    // Reconstruct tradeValues from saved evaluation so sliders can recalculate
+    const conditionKey = (evaluation.conditionScore || DEFAULT_CONDITION_SCORE).toString();
+    const loadedTradeValues: TradeValues = {
+      jdPowerTradeIn: parseNum(evaluation.jdPowerTradeIn),
+      bishAdjustedTradeIn: parseNum(evaluation.bishTivBase),
+      usedRetail: parseNum(evaluation.jdPowerRetailValue),
+      valuationResults: {
+        [conditionKey]: {
+          original_trade_value: parseNum(evaluation.jdPowerTradeIn),
+          adjusted_value: parseNum(evaluation.bishTivBase),
+          min_value: 0,
+          max_value: 0,
+          total_depreciation_percentage: 0,
+          mileage_adjustment_percentage: 0,
+          condition_adjustment_percentage: 0,
+        },
+      },
+    };
+
+    // Set flag to suppress cascading resets in JDPowerCascadingLookup
     set({
-      data: newData,
-      calculated: newCalc,
-      isLookupComplete: false,
-      tradeValues: undefined,
+      isLoadingPriorEval: true,
+      data: loadedData,
+      calculated: loadedCalc,
+      isLookupComplete: true, // Mark as complete so UI shows full state
+      tradeValues: loadedTradeValues,
     });
+
+    // Clear the flag after effects have run
+    setTimeout(() => {
+      set({ isLoadingPriorEval: false });
+    }, 100);
   },
 
   reset: () => {
     const newCalc = calculateValuation(initialData, 'initial-load', false, undefined);
     const newTradeInPercent = calculateTradeInPercentFromMargin(
-      newCalc.totalUnitCosts,
+      newCalc.bishTIVBase,
       newCalc.finalTradeOffer
     );
 
@@ -366,6 +433,7 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
       isLookupComplete: false,
       isLoading: false,
       isSubmitting: false,
+      isLoadingPriorEval: false,
     });
   },
 }));
@@ -377,6 +445,7 @@ export const useIsLookupComplete = () => useTradeStore((state) => state.isLookup
 export const useIsLoading = () => useTradeStore((state) => state.isLoading);
 export const useIsSubmitting = () => useTradeStore((state) => state.isSubmitting);
 export const useTradeValues = () => useTradeStore((state) => state.tradeValues);
+export const useIsLoadingPriorEval = () => useTradeStore((state) => state.isLoadingPriorEval);
 
 // Derived selectors
 export const useDepreciation = () => {

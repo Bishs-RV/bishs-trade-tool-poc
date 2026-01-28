@@ -45,7 +45,6 @@ export default function Section1UnitData({
     (isCustomInputMode
       ? !!data.customManufacturer || data.jdPowerManufacturerId !== null
       : data.jdPowerManufacturerId !== null &&
-        data.make.trim() !== '' &&
         data.jdPowerModelTrimId !== null);
 
   const handleRvTypeChange = (rvType: RVType) => {
@@ -61,16 +60,16 @@ export default function Section1UnitData({
         <h2 className="text-lg font-bold text-gray-900">Unit & Base Data</h2>
       </div>
       <div className="space-y-3">
-        {/* Customer Info */}
-        <CustomerInfoFields
-          customerName={data.customerName}
-          customerPhone={data.customerPhone}
-          customerEmail={data.customerEmail}
-          onUpdate={onUpdate}
-        />
-
-        {/* Stock/VIN & Search Prior Evaluations Card */}
-        <div className="p-3 bg-gradient-to-br from-gray-50 to-slate-50 rounded-lg border border-gray-300 space-y-2">
+        {/* Customer & Unit Identification Card */}
+        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
+          <h3 className="text-xs font-bold text-blue-900 uppercase tracking-wide">Customer & Unit ID</h3>
+          <CustomerInfoFields
+            customerFirstName={data.customerFirstName}
+            customerLastName={data.customerLastName}
+            customerPhone={data.customerPhone}
+            customerEmail={data.customerEmail}
+            onUpdate={onUpdate}
+          />
           <StockVinFields
             stockNumber={data.stockNumber}
             vin={data.vin}
@@ -81,14 +80,10 @@ export default function Section1UnitData({
               type="button"
               variant="primary"
               onClick={() => setIsPriorEvaluationsOpen(true)}
-              disabled={!data.vin && !data.stockNumber}
-              className="w-full"
+              disabled={!data.vin && !data.stockNumber && !data.customerFirstName && !data.customerLastName && !data.customerPhone}
+              className="w-full mt-2"
             >
-              {!data.vin && !data.stockNumber ? (
-                <span className="text-gray-300">Enter VIN or Stock # to search</span>
-              ) : (
-                'Search Prior Evaluations'
-              )}
+              Search Prior Evaluations
             </Button>
           )}
         </div>
@@ -148,6 +143,8 @@ export default function Section1UnitData({
           onOpenChange={setIsPriorEvaluationsOpen}
           vin={data.vin}
           stockNumber={data.stockNumber}
+          customerName={[data.customerFirstName, data.customerLastName].filter(Boolean).join(' ')}
+          customerPhone={data.customerPhone}
           onLoadEvaluation={onLoadEvaluation}
         />
       )}

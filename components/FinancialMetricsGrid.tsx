@@ -7,18 +7,18 @@ interface FinancialMetricsGridProps {
   retailPriceSource: 'jdpower' | 'custom';
   customRetailValue: number;
   jdPowerRetailValue: number;
-  replacementCost: number;
   finalTradeOffer: number;
   calculatedMarginAmount: number;
   calculatedMarginPercent: number;
   onUpdate: (updates: { retailPriceSource?: 'jdpower' | 'custom'; customRetailValue?: number }) => void;
 }
 
+const RETAIL_SOURCES = ['jdpower', 'custom'] as const;
+
 export default function FinancialMetricsGrid({
   retailPriceSource,
   customRetailValue,
   jdPowerRetailValue,
-  replacementCost,
   finalTradeOffer,
   calculatedMarginAmount,
   calculatedMarginPercent,
@@ -34,7 +34,7 @@ export default function FinancialMetricsGrid({
 
           {/* Retail Price Source Selector */}
           <div className="flex gap-0.5 bg-gray-100 p-0.5 rounded-md mb-2">
-            {(['jdpower', 'custom'] as const).map((source) => (
+            {RETAIL_SOURCES.map((source) => (
               <label
                 key={source}
                 className={`flex-1 text-center py-1 rounded-md cursor-pointer text-xs font-bold transition-all ${
@@ -51,14 +51,14 @@ export default function FinancialMetricsGrid({
                   onChange={() => onUpdate({ retailPriceSource: source })}
                   className="hidden"
                 />
-                {source === 'jdpower' ? 'Likely Retail' : 'Custom'}
+                {source === 'jdpower' ? '90% JDP Retail' : 'Custom'}
               </label>
             ))}
           </div>
 
           {/* Sublabel below toggle */}
           <p className="text-xs text-gray-500 italic mb-2 text-center">
-            Recent historical, less overages of ACV
+            90% of JD Power Retail Value
           </p>
 
           {/* Price Display/Input Area */}
@@ -90,8 +90,8 @@ export default function FinancialMetricsGrid({
           <span className="block text-xs font-bold text-gray-600 mb-1 uppercase tracking-wide">
             Bish&apos;s Replacement Cost
           </span>
-          <span className="block text-lg font-black text-gray-900">
-            {formatCurrency(replacementCost)}
+          <span className="block text-lg font-black text-gray-400 italic">
+            COMING SOON
           </span>
         </div>
 

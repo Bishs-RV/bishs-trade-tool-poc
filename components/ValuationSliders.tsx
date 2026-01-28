@@ -14,16 +14,25 @@ import { Field, FieldLabel } from '@/components/ui/field';
 interface ValuationSlidersProps {
   tradeInPercent: number;
   targetMarginPercent: number;
+  calculatedMarginPercent: number;
   onUpdate: (updates: { tradeInPercent?: number; targetMarginPercent?: number }) => void;
 }
 
 export default function ValuationSliders({
   tradeInPercent,
   targetMarginPercent,
+  calculatedMarginPercent,
   onUpdate,
 }: ValuationSlidersProps) {
+  const isMarginInvalid = targetMarginPercent < 0 || calculatedMarginPercent < 0;
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 border-b pb-3">
+      {isMarginInvalid && (
+        <div className="col-span-full bg-amber-100 border border-amber-300 text-amber-800 px-4 py-2 rounded-lg text-sm font-medium">
+          Warning: Negative margin — this deal will lose money.
+        </div>
+      )}
       {/* SLIDER 1: Trade-In % of Total Unit Costs */}
       <div className="space-y-2 bg-gradient-to-br from-slate-50 to-gray-50 p-3 rounded-lg border border-slate-200">
         <Field>

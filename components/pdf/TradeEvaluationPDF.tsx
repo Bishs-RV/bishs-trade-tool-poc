@@ -159,7 +159,8 @@ export function TradeEvaluationPDF({
     day: 'numeric',
   });
 
-  const hasCustomerInfo = !!(data.customerName || data.customerPhone || data.customerEmail);
+  const hasCustomerInfo = !!(data.customerFirstName || data.customerLastName || data.customerPhone || data.customerEmail);
+  const customerFullName = [data.customerFirstName, data.customerLastName].filter(Boolean).join(' ');
 
   return (
     <Document>
@@ -180,10 +181,10 @@ export function TradeEvaluationPDF({
               {hasCustomerInfo && (
                 <View style={styles.column}>
                   <Text style={styles.sectionTitle}>Customer Information</Text>
-                  {data.customerName && (
+                  {customerFullName && (
                     <View style={styles.row}>
                       <Text style={styles.label}>Name</Text>
-                      <Text style={styles.value}>{data.customerName}</Text>
+                      <Text style={styles.value}>{customerFullName}</Text>
                     </View>
                   )}
                   {data.customerPhone && (
@@ -263,7 +264,7 @@ export function TradeEvaluationPDF({
               )}
               <View style={styles.row}>
                 <Text style={styles.label}>Condition Score</Text>
-                <Text style={styles.value}>{data.conditionScore} / 9</Text>
+                <Text style={styles.value}>{data.conditionScore}</Text>
               </View>
             </View>
           </View>

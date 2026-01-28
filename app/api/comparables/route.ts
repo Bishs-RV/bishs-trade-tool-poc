@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { evoMajorunit, evoSalesdealdetail, evoSalesdealdetailunits, locationDetail } from '@/lib/db/schema'
-import { and, eq, gte, lte, ilike, sql, or, isNotNull } from 'drizzle-orm'
+import { and, eq, gte, lte, ilike, sql, or, isNotNull, desc, asc } from 'drizzle-orm'
 import type { ComparablesResponse, HistoricalComparable } from '@/lib/types/comparables'
 
-const MAX_YEAR_RANGE = 10
-const MAX_RESULTS = 50
+const DEFAULT_YEAR_RANGE = 1
+const MAX_YEAR_RANGE = 5
 
 const NOISE_WORDS = new Set([
   'series', 'by', 'inc', 'llc', 'corp', 'corporation', 'co', 'company',
@@ -37,21 +37,13 @@ function buildModelPattern(input: string): string {
   // "M-273QBXL" -> ["m", "273qbxl"] -> use "273qbxl"
   // This handles cases where JD Power has prefixes the DB doesn't
   const segments = normalized.split(/[^a-z0-9]+/).filter(s => s.length > 0)
-  if (segments.length === 0) {
-    return `%${normalized.replace(/[^a-z0-9]/g, '')}%`
-  }
-  // Use the longest segment (likely the actual model number)
-  const longest = segments.reduce((a, b) => a.length >= b.length ? a : b)
+  const longest = segments.length > 0
+    ? segments.reduce((a, b) => a.length >= b.length ? a : b)
+    : normalized.replace(/[^a-z0-9]/g, '')
   return `%${longest}%`
 }
 
-function parseYearSafely(year: string | null): number | null {
-  if (!year) return null
-  const parsed = parseInt(year, 10)
-  return isNaN(parsed) ? null : parsed
-}
-
-function parseNumericSafely(value: string | null): number | null {
+function parseNumeric(value: string | null): number | null {
   if (!value) return null
   const parsed = parseFloat(value)
   return isNaN(parsed) ? null : parsed
@@ -80,9 +72,9 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  let yearRange = yearRangeStr ? parseInt(yearRangeStr, 10) : 2
+  let yearRange = yearRangeStr ? parseInt(yearRangeStr, 10) : DEFAULT_YEAR_RANGE
   if (isNaN(yearRange) || yearRange < 0 || yearRange > MAX_YEAR_RANGE) {
-    yearRange = 2
+    yearRange = DEFAULT_YEAR_RANGE
   }
 
   const minYear = year - yearRange
@@ -95,6 +87,7 @@ export async function GET(request: NextRequest) {
     // Use REGEXP_REPLACE to normalize DB values for comparison
     // This allows "M-19" in DB to match pattern "%m19%"
     // Join to location_detail to get proper location code from Cmf_id
+    // Include Days on Lot calculation for currently listed units
     const listedUnitsRaw = await db
       .select({
         id: evoMajorunit.majorUnitHeaderId,
@@ -108,6 +101,7 @@ export async function GET(request: NextRequest) {
         listingDate: evoMajorunit.dateReceived,
         stockNumber: evoMajorunit.stockNumber,
         vin: evoMajorunit.vin,
+        daysOnLot: sql<number | null>`EXTRACT(DAY FROM NOW() - ${evoMajorunit.dateReceived})::INTEGER`.as('days_on_lot'),
       })
       .from(evoMajorunit)
       .leftJoin(
@@ -116,18 +110,26 @@ export async function GET(request: NextRequest) {
       )
       .where(
         and(
-          makePattern ? ilike(evoMajorunit.make, makePattern) : undefined,
-          manufacturerPattern ? ilike(evoMajorunit.manufacturer, manufacturerPattern) : undefined,
+          // Flexible manufacturer/make matching - check both fields with both patterns
+          // This handles cases where JD Power "Flagstaff by Forest River" maps to DB "FOREST RIVER" manufacturer + "FLAGSTAFF CLASSIC" make
+          or(
+            makePattern ? ilike(evoMajorunit.make, makePattern) : undefined,
+            manufacturerPattern ? ilike(evoMajorunit.make, manufacturerPattern) : undefined,
+            makePattern ? ilike(evoMajorunit.manufacturer, makePattern) : undefined,
+            manufacturerPattern ? ilike(evoMajorunit.manufacturer, manufacturerPattern) : undefined,
+          ),
           sql`LOWER(REGEXP_REPLACE(${evoMajorunit.model}, '[^a-zA-Z0-9]', '', 'g')) LIKE ${modelPattern}`,
           gte(evoMajorunit.modelYear, minYear),
           lte(evoMajorunit.modelYear, maxYear),
-          or(isNotNull(evoMajorunit.webPrice), isNotNull(evoMajorunit.dsrp))
+          or(isNotNull(evoMajorunit.webPrice), isNotNull(evoMajorunit.dsrp)),
+          sql`${evoMajorunit.stockNumber} NOT ILIKE 'L%'`
         )
       )
-      .limit(MAX_RESULTS)
+      .orderBy(desc(evoMajorunit.modelYear), asc(locationDetail.location))
 
-    // Query 1: Sold units from deal details (has soldPrice, daysInStore, soldDate)
+    // Query 1: Sold units from deal details (has soldPrice, soldDate)
     // Join to location_detail to get proper location code from cmfId
+    // Calculate days to sale as: deliveryDate - dateReceived
     const soldFromDealsRaw = await db
       .select({
         id: evoSalesdealdetailunits.dealUnitId,
@@ -136,13 +138,13 @@ export async function GET(request: NextRequest) {
         year: evoSalesdealdetailunits.year,
         manufacturer: evoSalesdealdetailunits.manufacturer,
         soldPrice: evoSalesdealdetailunits.unitSoldPrice,
-        daysInStore: evoSalesdealdetailunits.daysInStore,
         listingDate: evoSalesdealdetailunits.dateReceived,
         stockNumber: evoSalesdealdetailunits.stocknumber,
         vin: evoSalesdealdetailunits.vin,
         salesDealId: evoSalesdealdetailunits.salesDealId,
         soldDate: evoSalesdealdetail.deliveryDate,
         location: locationDetail.location,
+        daysToSale: sql<number | null>`EXTRACT(DAY FROM ${evoSalesdealdetail.deliveryDate} - ${evoSalesdealdetailunits.dateReceived})::INTEGER`.as('days_to_sale'),
       })
       .from(evoSalesdealdetailunits)
       .innerJoin(
@@ -155,47 +157,51 @@ export async function GET(request: NextRequest) {
       )
       .where(
         and(
-          makePattern ? ilike(evoSalesdealdetailunits.make, makePattern) : undefined,
-          manufacturerPattern ? ilike(evoSalesdealdetailunits.manufacturer, manufacturerPattern) : undefined,
+          // Flexible manufacturer/make matching - check both fields with both patterns
+          or(
+            makePattern ? ilike(evoSalesdealdetailunits.make, makePattern) : undefined,
+            manufacturerPattern ? ilike(evoSalesdealdetailunits.make, manufacturerPattern) : undefined,
+            makePattern ? ilike(evoSalesdealdetailunits.manufacturer, makePattern) : undefined,
+            manufacturerPattern ? ilike(evoSalesdealdetailunits.manufacturer, manufacturerPattern) : undefined,
+          ),
           sql`LOWER(REGEXP_REPLACE(${evoSalesdealdetailunits.model}, '[^a-zA-Z0-9]', '', 'g')) LIKE ${modelPattern}`,
           gte(sql`CAST(${evoSalesdealdetailunits.year} AS INTEGER)`, minYear),
           lte(sql`CAST(${evoSalesdealdetailunits.year} AS INTEGER)`, maxYear),
-          isNotNull(evoSalesdealdetailunits.unitSoldPrice)
+          isNotNull(evoSalesdealdetailunits.unitSoldPrice),
+          sql`evo_salesdealdetail.stagename = 'Delivered'`
         )
       )
-      .limit(MAX_RESULTS)
+      .orderBy(desc(sql`CAST(${evoSalesdealdetailunits.year} AS INTEGER)`), asc(locationDetail.location))
 
-    const listedUnits: HistoricalComparable[] = listedUnitsRaw.map(unit => {
-      const price = parseNumericSafely(unit.webPrice) ?? parseNumericSafely(unit.dsrp)
-      return {
-        id: String(unit.id),
-        make: unit.make,
-        model: unit.model,
-        year: unit.year,
-        manufacturer: unit.manufacturer,
-        location: unit.location,
-        listedPrice: price,
-        soldPrice: null,
-        soldDate: null,
-        listingDate: unit.listingDate,
-        daysToSale: null,
-        stockNumber: unit.stockNumber,
-        vin: unit.vin,
-      }
-    })
+    const listedUnits: HistoricalComparable[] = listedUnitsRaw.map(unit => ({
+      id: String(unit.id),
+      make: unit.make,
+      model: unit.model,
+      year: unit.year,
+      manufacturer: unit.manufacturer,
+      location: unit.location,
+      listedPrice: parseNumeric(unit.webPrice) ?? parseNumeric(unit.dsrp),
+      soldPrice: null,
+      soldDate: null,
+      listingDate: unit.listingDate,
+      daysToSale: null,
+      daysOnLot: unit.daysOnLot,
+      stockNumber: unit.stockNumber,
+      vin: unit.vin,
+    }))
 
     const soldUnits: HistoricalComparable[] = soldFromDealsRaw.map(unit => ({
       id: String(unit.id),
       make: unit.make,
       model: unit.model,
-      year: parseYearSafely(unit.year),
+      year: parseNumeric(unit.year),
       manufacturer: unit.manufacturer,
       location: unit.location,
       listedPrice: null,
-      soldPrice: parseNumericSafely(unit.soldPrice),
+      soldPrice: parseNumeric(unit.soldPrice),
       soldDate: unit.soldDate,
       listingDate: unit.listingDate,
-      daysToSale: unit.daysInStore,
+      daysToSale: unit.daysToSale,
       stockNumber: unit.stockNumber,
       vin: unit.vin,
     }))
