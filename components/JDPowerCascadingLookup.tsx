@@ -7,6 +7,7 @@ import type { MakeCategory, ModelTrim } from '@/lib/jdpower/types';
 import { SearchableCombobox, type ComboboxOption } from '@/components/ui/searchable-combobox';
 import { GroupedModelPicker } from '@/components/GroupedModelPicker';
 import { Field, FieldLabel } from '@/components/ui/field';
+import { useIsLoadingPriorEval } from '@/lib/store';
 
 interface JDPowerCascadingLookupProps {
   rvType: RVType;
@@ -43,6 +44,13 @@ export default function JDPowerCascadingLookup({
   jdPowerModelTrimId,
   onUpdate,
 }: JDPowerCascadingLookupProps) {
+  // Check if we're loading a prior evaluation (skip cascading resets)
+  const isLoadingPriorEval = useIsLoadingPriorEval();
+  const isLoadingPriorEvalRef = useRef(isLoadingPriorEval);
+  useEffect(() => {
+    isLoadingPriorEvalRef.current = isLoadingPriorEval;
+  }, [isLoadingPriorEval]);
+
   // Internal state for cascading data
   const [manufacturers, setManufacturers] = useState<MakeCategory[]>([]);
   const [years, setYears] = useState<number[]>([]);
@@ -101,19 +109,34 @@ export default function JDPowerCascadingLookup({
       }
     })();
 
-    setYears([]);
-    setModelTrims([]);
-    onUpdateRef.current({
-      jdPowerManufacturerId: null,
-      manufacturerName: '',
-      year: null,
-      make: '',
-      model: '',
-      jdPowerModelTrimId: null,
-    });
+    // Skip cascading reset when loading a prior evaluation
+    if (!isLoadingPriorEvalRef.current) {
+      setYears([]);
+      setModelTrims([]);
+      onUpdateRef.current({
+        jdPowerManufacturerId: null,
+        manufacturerName: '',
+        year: null,
+        make: '',
+        model: '',
+        jdPowerModelTrimId: null,
+      });
+    }
 
     return () => abortController.abort();
   }, [rvType]);
+
+  // Set manufacturerName when manufacturers load with a pre-selected ID (e.g., loading prior eval)
+  useEffect(() => {
+    if (jdPowerManufacturerId && manufacturers.length > 0) {
+      const match = manufacturers.find(
+        (m) => m.makeReturnTO.MakeID === jdPowerManufacturerId
+      );
+      if (match) {
+        onUpdateRef.current({ manufacturerName: match.makeReturnTO.MakeDisplayName });
+      }
+    }
+  }, [manufacturers, jdPowerManufacturerId]);
 
   // Fetch years when manufacturer changes
   useEffect(() => {
@@ -143,13 +166,16 @@ export default function JDPowerCascadingLookup({
       }
     })();
 
-    setModelTrims([]);
-    onUpdateRef.current({
-      year: null,
-      make: '',
-      model: '',
-      jdPowerModelTrimId: null,
-    });
+    // Skip cascading reset when loading a prior evaluation
+    if (!isLoadingPriorEvalRef.current) {
+      setModelTrims([]);
+      onUpdateRef.current({
+        year: null,
+        make: '',
+        model: '',
+        jdPowerModelTrimId: null,
+      });
+    }
 
     return () => abortController.abort();
   }, [jdPowerManufacturerId]);
@@ -163,12 +189,16 @@ export default function JDPowerCascadingLookup({
 
     const abortController = new AbortController();
     setIsLoadingModels(true);
-    setModelTrims([]);
-    onUpdateRef.current({
-      make: '',
-      model: '',
-      jdPowerModelTrimId: null,
-    });
+
+    // Skip cascading reset when loading a prior evaluation
+    if (!isLoadingPriorEvalRef.current) {
+      setModelTrims([]);
+      onUpdateRef.current({
+        make: '',
+        model: '',
+        jdPowerModelTrimId: null,
+      });
+    }
 
     (async () => {
       try {

@@ -7,4 +7,5 @@ export {
   useIsSubmitting,
   useTradeValues,
   useDepreciation,
+  useIsLoadingPriorEval,
 } from './trade-store';

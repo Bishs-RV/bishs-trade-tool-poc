@@ -5,9 +5,10 @@ import { z } from 'zod'
 import { or, ilike, desc } from 'drizzle-orm'
 
 const createValuationSchema = z.object({
-  // Customer Info
-  customerName: z.string().optional(),
-  customerPhone: z.string().optional(),
+  // Customer Info (phone is required)
+  customerFirstName: z.string().optional(),
+  customerLastName: z.string().optional(),
+  customerPhone: z.string().min(1, 'Phone is required'),
   customerEmail: z.union([z.string().email(), z.literal('')]).optional(),
 
   // Unit Data
@@ -34,8 +35,8 @@ const createValuationSchema = z.object({
   avgListingPrice: z.number().min(0).optional(),
 
   // Valuation Inputs
-  tradeInPercent: z.number().min(0).max(2).optional(),
-  targetMarginPercent: z.number().min(0).max(1).optional(),
+  tradeInPercent: z.number().max(2).optional(),
+  targetMarginPercent: z.number().max(1).optional(),
   retailPriceSource: z.string().optional(),
   customRetailValue: z.number().min(0).optional(),
 
@@ -121,8 +122,10 @@ export async function POST(request: NextRequest) {
 const searchSchema = z.object({
   vin: z.string().max(17).optional(),
   stockNumber: z.string().max(50).optional(),
-}).refine(data => data.vin || data.stockNumber, {
-  message: 'Either vin or stockNumber is required',
+  customerName: z.string().max(100).optional(),
+  customerPhone: z.string().max(20).optional(),
+}).refine(data => data.vin || data.stockNumber || data.customerName || data.customerPhone, {
+  message: 'At least one search parameter is required',
 })
 
 const escapeWildcards = (str: string) => str.replace(/[%_\\]/g, '\\$&')
@@ -133,6 +136,8 @@ export async function GET(request: NextRequest) {
     const result = searchSchema.safeParse({
       vin: searchParams.get('vin') || undefined,
       stockNumber: searchParams.get('stockNumber') || undefined,
+      customerName: searchParams.get('customerName') || undefined,
+      customerPhone: searchParams.get('customerPhone') || undefined,
     })
 
     if (!result.success) {
@@ -142,7 +147,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const { vin, stockNumber } = result.data
+    const { vin, stockNumber, customerName, customerPhone } = result.data
 
     // Build where conditions with escaped wildcards
     const conditions = []
@@ -152,13 +157,23 @@ export async function GET(request: NextRequest) {
     if (stockNumber) {
       conditions.push(ilike(tradeEvaluations.stockNumber, `%${escapeWildcards(stockNumber)}%`))
     }
+    if (customerName) {
+      const escapedName = escapeWildcards(customerName)
+      conditions.push(ilike(tradeEvaluations.customerFirstName, `%${escapedName}%`))
+      conditions.push(ilike(tradeEvaluations.customerLastName, `%${escapedName}%`))
+    }
+    if (customerPhone) {
+      // Strip non-digits for phone comparison
+      const digitsOnly = customerPhone.replace(/\D/g, '')
+      conditions.push(ilike(tradeEvaluations.customerPhone, `%${escapeWildcards(digitsOnly)}%`))
+    }
 
     const evaluations = await db
       .select()
       .from(tradeEvaluations)
       .where(or(...conditions))
       .orderBy(desc(tradeEvaluations.createdDate))
-      .limit(10)
+      .limit(20)
 
     return NextResponse.json({ evaluations })
   } catch (error: unknown) {

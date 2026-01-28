@@ -33,13 +33,8 @@ export const PREP_COST_TIERS: PrepCostTier[] = [
 // Finds the tier where value falls within the range (0-ceiling)
 // Example: $20,700 falls within 20-25k range → use the $25,000 tier
 export function getPrepCostTier(jdPowerTradeIn: number): PrepCostTier {
-  for (const tier of PREP_COST_TIERS) {
-    if (jdPowerTradeIn <= tier.ceiling) {
-      return tier;
-    }
-  }
-  // Value exceeds all ceilings, return highest tier
-  return PREP_COST_TIERS[PREP_COST_TIERS.length - 1];
+  return PREP_COST_TIERS.find(tier => jdPowerTradeIn <= tier.ceiling)
+    ?? PREP_COST_TIERS[PREP_COST_TIERS.length - 1];
 }
 
 // Slider ranges
@@ -54,6 +49,7 @@ export const DEFAULT_TRADE_IN_PERCENT = 1.0;
 export const DEFAULT_LOCATION = 'MID';
 export const DEFAULT_RV_TYPE: RVType = 'TT';
 export const DEFAULT_CONDITION_SCORE = 7;
+export const DEFAULT_ADDITIONAL_PREP_COST = 1500;
 
 // RV Type options
 export const RV_TYPE_OPTIONS: Array<{ value: RVType; label: string }> = [

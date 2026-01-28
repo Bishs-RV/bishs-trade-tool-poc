@@ -6,8 +6,9 @@ export const tradeEvaluations = tradeToolSchema.table(
   'trade_evaluations',
   {
     tradeEvaluationId: bigserial('trade_evaluation_id', { mode: 'number' }).primaryKey(),
-    customerName: text('customer_name'),
-    customerPhone: text('customer_phone'),
+    customerFirstName: text('customer_first_name'),
+    customerLastName: text('customer_last_name'),
+    customerPhone: text('customer_phone').notNull(),
     customerEmail: text('customer_email'),
     stockNumber: text('stock_number'),
     location: text('location'),
@@ -24,6 +25,7 @@ export const tradeEvaluations = tradeToolSchema.table(
     unitAddOns: text('unit_add_ons'),
     additionalPrepCost: numeric('additional_prep_cost', { precision: 10, scale: 2 }),
     avgListingPrice: numeric('avg_listing_price', { precision: 10, scale: 2 }),
+    // TODO: tradeInPercent is dead code - slider was removed but field persists for schema stability
     tradeInPercent: numeric('trade_in_percent', { precision: 5, scale: 4 }),
     targetMarginPercent: numeric('target_margin_percent', { precision: 5, scale: 4 }),
     retailPriceSource: text('retail_price_source'),
@@ -64,3 +66,9 @@ export * from './schema/evo-units'
 
 // Re-export location detail table
 export * from './schema/location-detail'
+
+// Re-export UKG employee view
+export * from './schema/ukg-employee'
+
+// Re-export EVO dealer table
+export * from './schema/evo-dealer'

@@ -41,21 +41,12 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    console.log('[trade-value] Request params:', {
-      modelTrimId: modelTrimIdNum,
-      condition: conditionNum,
-      mileage: mileageNum,
-      options: options || undefined,
-    })
-
     const result = await getTradeValue({
       modelTrimId: modelTrimIdNum,
       condition: conditionNum,
       mileage: mileageNum,
       options: options || undefined,
     })
-
-    console.log('[trade-value] BishConnect response:', result)
 
     return NextResponse.json(result)
   } catch (error: unknown) {

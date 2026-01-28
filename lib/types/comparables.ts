@@ -14,6 +14,7 @@ export interface HistoricalComparable {
   soldDate: string | null
   listingDate: string | null
   daysToSale: number | null
+  daysOnLot?: number | null
   stockNumber: string | null
   vin: string | null
 }

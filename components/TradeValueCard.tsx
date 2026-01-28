@@ -37,7 +37,7 @@ export default function TradeValueCard({
         type="button"
         variant="primary"
         onClick={onLookup}
-        disabled={!isLookupReady || isLookupComplete || isLoading}
+        disabled={!isLookupReady || isLoading}
         className="w-full mt-2"
       >
         {isLoading ? (
@@ -45,9 +45,7 @@ export default function TradeValueCard({
             <span className="animate-spin">⏳</span> Loading...
           </span>
         ) : isLookupComplete ? (
-          <span className="flex items-center justify-center gap-2">
-            <span className="text-xl">✓</span> Trade Value Loaded
-          </span>
+          'Refresh Trade Value'
         ) : (
           'Get Trade Value'
         )}
