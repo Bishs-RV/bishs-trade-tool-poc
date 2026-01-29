@@ -32,7 +32,17 @@ export default function AuthenticatedLayout({
   }
 
   return (
-    <BishsLayout user={user} onSignOut={handleSignOut} environment="development">
+    <BishsLayout
+      user={user}
+      onSignOut={handleSignOut}
+      environment={
+        process.env.NEXT_PUBLIC_VERCEL_ENV === "production"
+          ? "production"
+          : process.env.NEXT_PUBLIC_VERCEL_ENV === "preview"
+            ? "staging"
+            : "development"
+      }
+    >
       {children}
     </BishsLayout>
   );
