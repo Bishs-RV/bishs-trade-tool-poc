@@ -2,7 +2,7 @@ import { getToken } from 'next-auth/jwt';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   // If Azure AD is not configured, allow all requests through (MockAuthProvider handles auth)
   const isAzureADConfigured =
     process.env.AZURE_AD_CLIENT_ID &&
