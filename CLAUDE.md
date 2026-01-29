@@ -32,6 +32,7 @@ Always run `npm run lint && npm run build` after making changes.
 - **Base branch**: Always create feature branches from `staging`
 - **PR target**: All PRs should target `staging`, not `main`
 - `main` is only updated via staging merges
+- **Merging PRs**: Never use `--delete-branch` when merging, especially for staging → main merges
 
 ## Git Worktrees
 
