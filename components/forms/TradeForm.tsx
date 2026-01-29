@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useMockAuth } from '@bishs-rv/bishs-global-header';
-import type { TradeValues } from '@/lib/calculations';
+import { toast } from 'sonner';
+import type { TradeValues, DriverId } from '@/lib/calculations';
+import type { TradeData } from '@/lib/types';
 import {
   useTradeStore,
   useTradeData,
@@ -12,16 +14,15 @@ import {
   useIsLoading,
   useIsSubmitting,
   useDepreciation,
+  useEvaluationCreatedBy,
+  useEvaluationCreatedDate,
 } from '@/lib/store';
-import {
-  DEFAULT_CONDITION_SCORE,
-  TARGET_MARGIN_PERCENT,
-} from '@/lib/constants';
 import Section1UnitData from '@/components/Section1UnitData';
 import Section2Condition from '@/components/Section2Condition';
 import Section3Market from '@/components/Section3Market';
 import Section4Valuation from '@/components/Section4Valuation';
 import StickyActionBar from '@/components/StickyActionBar';
+import SubmissionSuccessDialog from '@/components/SubmissionSuccessDialog';
 import { Textarea } from '@/components/ui/textarea';
 
 export default function TradeForm() {
@@ -30,9 +31,9 @@ export default function TradeForm() {
   const mockAuth = useMockAuth();
 
   const isRealAuthActive = status === "authenticated" && session?.user;
-  const userName = isRealAuthActive
-    ? (session.user.name ?? "Unknown User")
-    : (mockAuth.user?.name ?? "Test User");
+  const userEmail = isRealAuthActive
+    ? (session.user.email ?? "unknown@bishs.com")
+    : (mockAuth.user?.email ?? "test@bishs.com");
 
   // Zustand store state
   const data = useTradeData();
@@ -41,17 +42,33 @@ export default function TradeForm() {
   const isLoading = useIsLoading();
   const isSubmitting = useIsSubmitting();
   const depreciation = useDepreciation();
+  const evaluationCreatedBy = useEvaluationCreatedBy();
+  const evaluationCreatedDate = useEvaluationCreatedDate();
+
+  // Get current user name from session or mock auth
+  const currentUserName = isRealAuthActive
+    ? (session.user.name ?? undefined)
+    : (mockAuth.user?.name ?? undefined);
 
   // Zustand store actions
   const {
+    updateField,
     updateFields,
     recalculate,
+    resetForNewValuation,
     setTradeValues,
     setIsLookupComplete,
     setIsLoading,
     setIsSubmitting,
     loadEvaluation,
+    reset,
   } = useTradeStore();
+
+  // Success dialog state
+  const [successDialogOpen, setSuccessDialogOpen] = useState(false);
+
+  // User's location zipcode for RVTrader search
+  const [userZipCode, setUserZipCode] = useState<string | null>(null);
 
   // Initial calculation on mount
   useEffect(() => {
@@ -59,10 +76,29 @@ export default function TradeForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleUpdate = (
-    updates: Parameters<typeof updateFields>[0],
-    driverId: Parameters<typeof updateFields>[1] = 'trade-in-percent-slider'
-  ) => {
+  // Fetch user's default location from UKG on mount
+  useEffect(() => {
+    async function fetchUserLocation() {
+      try {
+        const response = await fetch('/api/user/location');
+        if (response.ok) {
+          const result = await response.json();
+          if (result.location) {
+            updateField('location', result.location);
+          }
+          if (result.zipCode) {
+            setUserZipCode(result.zipCode);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch user location:', error);
+      }
+    }
+    fetchUserLocation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleUpdate = (updates: Partial<TradeData>, driverId: DriverId = 'initial-load') => {
     updateFields(updates, driverId);
   };
 
@@ -73,7 +109,7 @@ export default function TradeForm() {
       data.customModel !== undefined;
 
     if (!isCustomInputMode && !data.jdPowerModelTrimId) {
-      alert('Please select a model to get trade value');
+      toast.warning('Please select a model to get trade value');
       return;
     }
 
@@ -112,27 +148,20 @@ export default function TradeForm() {
         valuationResults: result.valuationResults,
       };
 
+      // Set avgListingPrice based on lookup results
+      const avgListingPrice = newTradeValues.bishAdjustedTradeIn > 0
+        ? newTradeValues.bishAdjustedTradeIn * 1.15
+        : data.avgListingPrice;
+
+      // Set trade values and mark lookup complete first
       setTradeValues(newTradeValues);
-
-      // Reset condition-related fields for new valuation + set avgListingPrice
-      const updates = {
-        avgListingPrice:
-          newTradeValues.bishAdjustedTradeIn > 0
-            ? newTradeValues.bishAdjustedTradeIn * 1.15
-            : data.avgListingPrice,
-        // Reset fields that should not persist between valuations
-        conditionScore: DEFAULT_CONDITION_SCORE,
-        majorIssues: '',
-        unitAddOns: '',
-        additionalPrepCost: 0,
-        valuationNotes: '',
-        targetMarginPercent: TARGET_MARGIN_PERCENT,
-        retailPriceSource: 'jdpower' as const,
-        customRetailValue: 0,
-      };
-
-      recalculate('lookup-complete', updates, newTradeValues);
       setIsLookupComplete(true);
+
+      // Reset condition fields to defaults and clear evaluation metadata
+      resetForNewValuation();
+
+      // Update avgListingPrice separately (calculated from lookup results)
+      updateField('avgListingPrice', avgListingPrice);
     } catch (error) {
       console.error('Lookup error:', error);
       setIsLookupComplete(false);
@@ -147,8 +176,9 @@ export default function TradeForm() {
 
     try {
       const payload = {
-        customerName: data.customerName || undefined,
-        customerPhone: data.customerPhone || undefined,
+        customerFirstName: data.customerFirstName || undefined,
+        customerLastName: data.customerLastName || undefined,
+        customerPhone: data.customerPhone,
         customerEmail: data.customerEmail || undefined,
         stockNumber: data.stockNumber || undefined,
         location: data.location || undefined,
@@ -165,6 +195,7 @@ export default function TradeForm() {
         unitAddOns: data.unitAddOns || undefined,
         additionalPrepCost: data.additionalPrepCost || undefined,
         avgListingPrice: data.avgListingPrice || undefined,
+        // TODO: tradeInPercent is dead code - remove after schema migration
         tradeInPercent: data.tradeInPercent,
         targetMarginPercent: data.targetMarginPercent,
         retailPriceSource: data.retailPriceSource,
@@ -185,7 +216,7 @@ export default function TradeForm() {
         calculatedMarginAmount: calculated.calculatedMarginAmount,
         calculatedMarginPercent: calculated.calculatedMarginPercent,
         valuationNotes: data.valuationNotes || undefined,
-        createdBy: userName,
+        createdBy: userEmail,
       };
 
       const response = await fetch('/api/valuations', {
@@ -198,7 +229,15 @@ export default function TradeForm() {
         let errorMessage = 'Failed to save valuation';
         try {
           const error = await response.json();
-          errorMessage = error.error || errorMessage;
+          if (error.details) {
+            // Format validation errors
+            const fields = Object.entries(error.details)
+              .map(([field, messages]) => `${field}: ${(messages as string[]).join(', ')}`)
+              .join('; ');
+            errorMessage = fields || error.error || errorMessage;
+          } else {
+            errorMessage = error.error || errorMessage;
+          }
         } catch {
           // Response body is not valid JSON
         }
@@ -209,11 +248,13 @@ export default function TradeForm() {
       if (!result.evaluation?.tradeEvaluationId) {
         throw new Error('Invalid response from server');
       }
-      alert(`Valuation saved successfully! ID: ${result.evaluation.tradeEvaluationId}`);
+      setSuccessDialogOpen(true);
     } catch (error) {
       console.error('Submit error:', error);
       const message = error instanceof Error ? error.message : 'Failed to save valuation';
-      alert(message);
+      toast.error('Failed to save valuation', {
+        description: message,
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -228,7 +269,7 @@ export default function TradeForm() {
           <Section1UnitData
             data={data}
             calculated={calculated}
-            onUpdate={(updates) => handleUpdate(updates, 'trade-in-percent-slider')}
+            onUpdate={(updates) => handleUpdate(updates, 'initial-load')}
             onLookup={handleLookup}
             isLookupComplete={isLookupComplete}
             isLoading={isLoading}
@@ -247,7 +288,7 @@ export default function TradeForm() {
                   ? 'condition-score'
                   : updates.additionalPrepCost !== undefined
                     ? 'additional-prep-cost'
-                    : 'trade-in-percent-slider';
+                    : 'initial-load';
               handleUpdate(updates, driverId);
             }}
             isLocked={!isLookupComplete}
@@ -261,6 +302,7 @@ export default function TradeForm() {
               data={data}
               onUpdate={(updates) => handleUpdate(updates, 'avg-listing-price')}
               isLocked={!isLookupComplete}
+              zipCode={userZipCode}
             />
           </div>
 
@@ -304,10 +346,13 @@ export default function TradeForm() {
                 ? 'trade-in-percent-slider'
                 : updates.targetMarginPercent !== undefined
                   ? 'margin-percent-slider'
-                  : 'trade-in-percent-slider';
+                  : 'initial-load';
             handleUpdate(updates, driverId);
           }}
           isLocked={!isLookupComplete}
+          currentUserName={currentUserName}
+          createdBy={evaluationCreatedBy}
+          createdDate={evaluationCreatedDate}
         />
       </div>
 
@@ -318,6 +363,19 @@ export default function TradeForm() {
         data={data}
         calculated={calculated}
         depreciation={depreciation}
+        currentUserName={currentUserName}
+        createdBy={evaluationCreatedBy}
+        createdDate={evaluationCreatedDate}
+      />
+
+      {/* Success Dialog */}
+      <SubmissionSuccessDialog
+        open={successDialogOpen}
+        onClose={() => setSuccessDialogOpen(false)}
+        onStartNew={() => {
+          setSuccessDialogOpen(false);
+          reset();
+        }}
       />
     </form>
   );

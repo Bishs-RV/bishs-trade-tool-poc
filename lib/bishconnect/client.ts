@@ -75,8 +75,6 @@ export async function getTradeValue({
     url.searchParams.set('options', options)
   }
 
-  console.log('[BishConnect] Fetching trade value from:', url.toString())
-
   const response = await fetch(url.toString(), {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -90,7 +88,6 @@ export async function getTradeValue({
   }
 
   const data = (await response.json()) as TradeValueResponse
-  console.log('[BishConnect] Full API response:', JSON.stringify(data, null, 2))
 
   // Get the condition-specific valuation result if available
   const conditionKey = condition.toString()
@@ -102,8 +99,6 @@ export async function getTradeValue({
     usedRetail: data.values.used_retail,
     valuationResults: data.valuation_results,
   }
-
-  console.log('[BishConnect] Returning values:', result)
 
   return result
 }
@@ -173,8 +168,6 @@ export async function getFuzzyTradeValue({
     url.searchParams.set('unit_class', unitClass)
   }
 
-  console.log('[BishConnect] Fuzzy matching trade value from:', url.toString())
-
   const response = await fetch(url.toString(), {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -184,7 +177,6 @@ export async function getFuzzyTradeValue({
 
   // Handle 404 as "no match found" instead of throwing
   if (response.status === 404) {
-    console.log('[BishConnect] Fuzzy match: No matching RV model found')
     return {
       jdPowerTradeIn: 0,
       bishAdjustedTradeIn: 0,
@@ -199,7 +191,6 @@ export async function getFuzzyTradeValue({
   }
 
   const data = (await response.json()) as FuzzyTradeValueResponse
-  console.log('[BishConnect] Fuzzy match response:', JSON.stringify(data, null, 2))
 
   // If no match found, return zero values with matched=false
   if (!data.values || !data.matched) {

@@ -30,6 +30,7 @@ export function calculateValuation(
   isLookupComplete: boolean,
   tradeValues?: TradeValues
 ): CalculatedValues {
+
   // Initialize calculated values
   const calculated: CalculatedValues = {
     jdPowerTradeIn: 0,
@@ -75,18 +76,18 @@ export function calculateValuation(
   calculated.reconCost = reconTier.recon;
 
   // Sold Prep Cost: Sum of Get Ready + Orientation + Detail + Gift Certificate + Shop Supplies
-  calculated.soldPrepCost = 
-    prepTier.getReady + 
-    prepTier.orientation + 
-    prepTier.detail + 
-    prepTier.giftCertificate + 
+  calculated.soldPrepCost =
+    prepTier.getReady +
+    prepTier.orientation +
+    prepTier.detail +
+    prepTier.giftCertificate +
     prepTier.shopSupplies;
 
   // Total Prep Costs
-  calculated.totalPrepCosts = 
-    calculated.pdiCost + 
-    calculated.reconCost + 
-    calculated.soldPrepCost + 
+  calculated.totalPrepCosts =
+    calculated.pdiCost +
+    calculated.reconCost +
+    calculated.soldPrepCost +
     data.additionalPrepCost;
 
   // Bish's TIV Base = condition-specific adjusted_value from API
@@ -98,39 +99,43 @@ export function calculateValuation(
   calculated.totalUnitCosts = calculated.bishTIVBase + calculated.totalPrepCosts;
 
   // Determine active retail price based on source
-  calculated.activeRetailPrice = 
+  // When using JD Power, apply 90% factor (90% of JD Power Retail)
+  calculated.activeRetailPrice =
     (data.retailPriceSource === 'custom' && data.customRetailValue > 0)
       ? data.customRetailValue
-      : calculated.jdPowerRetailValue;
+      : calculated.jdPowerRetailValue * 0.90;
 
   // TWO-WAY SLIDER LOGIC
+  // Only calculate final offer when we have real data (after lookup)
+  const hasRealData = isLookupComplete || driverId === 'lookup-complete';
   let finalTradeOffer = 0;
 
-  const driversForTradeInPercentRecalc: DriverId[] = [
-    'trade-in-percent-slider',
-    'rv-type',
-    'condition-score',
-    'avg-listing-price',
-    'additional-prep-cost',
-  ];
+  if (!hasRealData) {
+    // Before lookup: don't calculate, preserve defaults
+    calculated.finalTradeOffer = 0;
+    calculated.calculatedMarginAmount = 0;
+    calculated.calculatedMarginPercent = data.targetMarginPercent;
+    return calculated;
+  }
 
-  if (driversForTradeInPercentRecalc.includes(driverId)) {
-    // Scenario 1: User adjusts Trade-In % or any INPUT that changes Bish's Value/Costs
-    // Final Trade Offer = Trade-In % * Total Unit Costs
-    finalTradeOffer = calculated.totalUnitCosts * data.tradeInPercent;
-
-  } else if (driverId === 'margin-percent-slider' || driverId === 'initial-load' || driverId === 'lookup-complete') {
-    // Scenario 2: User adjusts Target Margin % (Relative to Active Retail Price) OR Initial Load
+  if (driverId === 'trade-in-percent-slider') {
+    // Scenario 1: User adjusts Trade-In %
+    // Final Trade Offer = Trade-In % * Bish's TIV Base (the JD Power adjusted value)
+    // Prep costs affect margin, not the offer amount
+    finalTradeOffer = calculated.bishTIVBase * data.tradeInPercent;
+  } else {
+    // Scenario 2: All other cases use margin-driven formula
+    // Margin = Retail - Final Offer - Prep Costs
+    // So: Final Offer = Retail - Margin - Prep Costs
     const targetMarginAmount = calculated.activeRetailPrice * data.targetMarginPercent;
-
-    // Final Trade Offer = Active Retail Price - Target Margin Amount
-    finalTradeOffer = calculated.activeRetailPrice - targetMarginAmount;
+    finalTradeOffer = calculated.activeRetailPrice - targetMarginAmount - calculated.totalPrepCosts;
     finalTradeOffer = Math.max(0, finalTradeOffer);
   }
 
   // Final metrics
+  // Margin = what we keep = Retail - Offer - Prep Costs
   calculated.finalTradeOffer = finalTradeOffer;
-  calculated.calculatedMarginAmount = calculated.activeRetailPrice - finalTradeOffer;
+  calculated.calculatedMarginAmount = calculated.activeRetailPrice - finalTradeOffer - calculated.totalPrepCosts;
   calculated.calculatedMarginPercent = calculated.activeRetailPrice > 0
     ? calculated.calculatedMarginAmount / calculated.activeRetailPrice
     : 0;
@@ -140,13 +145,14 @@ export function calculateValuation(
 
 /**
  * Calculate the inverse Trade-In % based on margin slider movement
+ * Trade-In % = Final Offer / Bish's TIV Base
  */
 export function calculateTradeInPercentFromMargin(
-  totalUnitCosts: number,
+  bishTIVBase: number,
   finalTradeOffer: number
 ): number {
-  if (totalUnitCosts <= 0) return DEFAULT_TRADE_IN_PERCENT;
-  const percent = finalTradeOffer / totalUnitCosts;
+  if (bishTIVBase <= 0) return DEFAULT_TRADE_IN_PERCENT;
+  const percent = finalTradeOffer / bishTIVBase;
   // Allow up to 150% (TRADE_IN_PERCENT_MAX + 20% buffer for margin-driven calculations)
   return Math.min(TRADE_IN_PERCENT_MAX + 0.2, Math.max(0, percent));
 }

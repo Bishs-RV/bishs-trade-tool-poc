@@ -10,6 +10,9 @@ interface StickyActionBarProps {
   data: TradeData;
   calculated: CalculatedValues;
   depreciation?: DepreciationInfo;
+  currentUserName?: string;
+  createdBy?: string;
+  createdDate?: Date;
 }
 
 export default function StickyActionBar({
@@ -18,15 +21,21 @@ export default function StickyActionBar({
   data,
   calculated,
   depreciation,
+  currentUserName,
+  createdBy,
+  createdDate,
 }: StickyActionBarProps) {
   if (isLocked) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex gap-3">
+    <div className="fixed bottom-4 right-4 z-50 flex items-center gap-3">
       <PDFDownloadButton
         data={data}
         calculated={calculated}
         depreciation={depreciation}
+        currentUserName={currentUserName}
+        createdBy={createdBy}
+        createdDate={createdDate}
       />
       <Button
         type="submit"

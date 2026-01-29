@@ -53,6 +53,7 @@ export const evoSalesdealdetail = pgTable(
     dealerId: varchar('DealerId', { length: 255 }),
     cmfId: varchar('Cmf_id', { length: 255 }),
     deliveryDate: timestamp('DeliveryDate', { withTimezone: true, mode: 'string' }),
+    stageName: varchar('StageName', { length: 255 }),
   }
 )
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState, useRef } from 'react';
 import { formatCurrency, formatPercent } from '@/lib/calculations';
 import { Input } from '@/components/ui/input';
 
@@ -7,23 +8,72 @@ interface FinancialMetricsGridProps {
   retailPriceSource: 'jdpower' | 'custom';
   customRetailValue: number;
   jdPowerRetailValue: number;
-  replacementCost: number;
   finalTradeOffer: number;
   calculatedMarginAmount: number;
   calculatedMarginPercent: number;
   onUpdate: (updates: { retailPriceSource?: 'jdpower' | 'custom'; customRetailValue?: number }) => void;
+  // Metadata for display
+  currentUserName?: string;
+  location?: string;
+  createdBy?: string;
+  createdDate?: Date;
 }
+
+const RETAIL_SOURCES = ['jdpower', 'custom'] as const;
 
 export default function FinancialMetricsGrid({
   retailPriceSource,
   customRetailValue,
   jdPowerRetailValue,
-  replacementCost,
   finalTradeOffer,
   calculatedMarginAmount,
   calculatedMarginPercent,
   onUpdate,
+  currentUserName,
+  location,
+  createdBy,
+  createdDate,
 }: FinancialMetricsGridProps) {
+  const [lookedUpName, setLookedUpName] = useState<string | null>(null);
+  const lastLookedUpEmailRef = useRef<string | undefined>(undefined);
+
+  // Look up creator's name for loaded evaluations
+  useEffect(() => {
+    if (!createdBy || createdBy === lastLookedUpEmailRef.current) return;
+
+    lastLookedUpEmailRef.current = createdBy;
+    let cancelled = false;
+
+    const lookupUser = async () => {
+      try {
+        const res = await fetch(`/api/user/lookup?email=${encodeURIComponent(createdBy)}`);
+        if (!res.ok) throw new Error('Lookup failed');
+        const data = await res.json();
+
+        if (cancelled) return;
+
+        const fullName = `${data.firstName || ''} ${data.lastName || ''}`.trim();
+        setLookedUpName(fullName || createdBy.split('@')[0]);
+      } catch (err) {
+        if (cancelled) return;
+        console.error('Failed to lookup user:', err);
+        setLookedUpName(createdBy.split('@')[0]);
+      }
+    };
+
+    lookupUser();
+    return () => { cancelled = true; };
+  }, [createdBy]);
+
+  // Use looked up name for loaded evaluations, current user for new evaluations
+  const userName = createdBy ? lookedUpName : currentUserName;
+  const displayDate = createdDate ? new Date(createdDate) : new Date();
+  const dateStr = displayDate.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 items-stretch">
         {/* 1. Retail Price (JD Power or Custom) */}
@@ -34,7 +84,7 @@ export default function FinancialMetricsGrid({
 
           {/* Retail Price Source Selector */}
           <div className="flex gap-0.5 bg-gray-100 p-0.5 rounded-md mb-2">
-            {(['jdpower', 'custom'] as const).map((source) => (
+            {RETAIL_SOURCES.map((source) => (
               <label
                 key={source}
                 className={`flex-1 text-center py-1 rounded-md cursor-pointer text-xs font-bold transition-all ${
@@ -51,14 +101,14 @@ export default function FinancialMetricsGrid({
                   onChange={() => onUpdate({ retailPriceSource: source })}
                   className="hidden"
                 />
-                {source === 'jdpower' ? 'Likely Retail' : 'Custom'}
+                {source === 'jdpower' ? '90% JDP Retail' : 'Custom'}
               </label>
             ))}
           </div>
 
           {/* Sublabel below toggle */}
           <p className="text-xs text-gray-500 italic mb-2 text-center">
-            Recent historical, less overages of ACV
+            90% of JD Power Retail Value
           </p>
 
           {/* Price Display/Input Area */}
@@ -90,8 +140,8 @@ export default function FinancialMetricsGrid({
           <span className="block text-xs font-bold text-gray-600 mb-1 uppercase tracking-wide">
             Bish&apos;s Replacement Cost
           </span>
-          <span className="block text-lg font-black text-gray-900">
-            {formatCurrency(replacementCost)}
+          <span className="block text-lg font-black text-gray-400 italic">
+            COMING SOON
           </span>
         </div>
 
@@ -107,6 +157,12 @@ export default function FinancialMetricsGrid({
               {formatCurrency(finalTradeOffer)}
             </span>
             <div className="mt-2 h-1 w-20 mx-auto bg-white/50 rounded-full" />
+            {/* Metadata: Date | User | Store */}
+            {(userName || location) && (
+              <p className="mt-2 text-xs text-orange-100/80 font-medium">
+                {[dateStr, userName, location].filter(Boolean).join(' | ')}
+              </p>
+            )}
           </div>
         </div>
 

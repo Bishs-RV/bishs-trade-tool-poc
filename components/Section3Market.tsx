@@ -10,6 +10,7 @@ interface Section3Props {
   data: TradeData
   onUpdate: (updates: Partial<TradeData>) => void
   isLocked: boolean
+  zipCode?: string | null
 }
 
 const EMPTY_METRICS: ComparablesMetrics = {
@@ -24,6 +25,7 @@ export default function Section3Market({
   data,
   onUpdate,
   isLocked,
+  zipCode,
 }: Section3Props) {
   const [listedUnits, setListedUnits] = useState<HistoricalComparable[]>([])
   const [soldUnits, setSoldUnits] = useState<HistoricalComparable[]>([])
@@ -88,10 +90,17 @@ export default function Section3Market({
 
   const generateRVTraderLink = () => {
     const params = new URLSearchParams()
-    if (data.make) params.set('make', data.make)
-    if (data.model) params.set('model', data.model)
-    if (data.year) params.set('year', data.year.toString())
-    return `https://www.rvtrader.com/search?${params.toString()}`
+
+    // RV Trader uses make for manufacturer, model for series/line, trim for model number
+    if (data.manufacturerName) params.set('make', data.manufacturerName)
+    if (data.make) params.set('model', data.make)
+    if (data.model) params.set('trim', data.model)
+    if (zipCode) {
+      params.set('zip', zipCode)
+      params.set('radius', '10000')
+    }
+
+    return `https://www.rvtrader.com/find-rvs-for-sale?${params.toString()}`
   }
 
   return (
@@ -169,7 +178,7 @@ export default function Section3Market({
               rel="noopener noreferrer"
               className="text-blue-700 hover:text-blue-900 font-bold underline text-sm flex items-center justify-center gap-2 transition-colors"
             >
-              <span>RV Trader Search for {data.year || ''} {data.make || ''} {data.model || ''}</span>
+              <span>RV Trader Search for {data.year || ''} {data.manufacturerName || ''} {data.make || ''}</span>
               <span>→</span>
             </a>
           </div>

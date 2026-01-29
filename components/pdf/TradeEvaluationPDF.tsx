@@ -17,6 +17,8 @@ interface TradeEvaluationPDFProps {
   calculated: CalculatedValues;
   depreciation?: DepreciationInfo;
   generatedDate?: Date;
+  userName?: string;
+  storeCode?: string;
 }
 
 const styles = StyleSheet.create({
@@ -152,6 +154,8 @@ export function TradeEvaluationPDF({
   calculated,
   depreciation,
   generatedDate = new Date(),
+  userName,
+  storeCode,
 }: TradeEvaluationPDFProps) {
   const dateStr = generatedDate.toLocaleDateString('en-US', {
     year: 'numeric',
@@ -159,7 +163,12 @@ export function TradeEvaluationPDF({
     day: 'numeric',
   });
 
-  const hasCustomerInfo = !!(data.customerName || data.customerPhone || data.customerEmail);
+  // Build metadata string for header/footer
+  const metadataParts = [dateStr, userName, storeCode].filter(Boolean);
+  const metadataStr = metadataParts.join(' | ');
+
+  const hasCustomerInfo = !!(data.customerFirstName || data.customerLastName || data.customerPhone || data.customerEmail);
+  const customerFullName = [data.customerFirstName, data.customerLastName].filter(Boolean).join(' ');
 
   return (
     <Document>
@@ -168,7 +177,7 @@ export function TradeEvaluationPDF({
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Trade-In Evaluation Summary</Text>
           <Text style={styles.headerSubtitle}>
-            Bish&apos;s RV | Generated: {dateStr}
+            Bish&apos;s RV | {metadataStr}
           </Text>
         </View>
 
@@ -180,10 +189,10 @@ export function TradeEvaluationPDF({
               {hasCustomerInfo && (
                 <View style={styles.column}>
                   <Text style={styles.sectionTitle}>Customer Information</Text>
-                  {data.customerName && (
+                  {customerFullName && (
                     <View style={styles.row}>
                       <Text style={styles.label}>Name</Text>
-                      <Text style={styles.value}>{data.customerName}</Text>
+                      <Text style={styles.value}>{customerFullName}</Text>
                     </View>
                   )}
                   {data.customerPhone && (
@@ -263,7 +272,7 @@ export function TradeEvaluationPDF({
               )}
               <View style={styles.row}>
                 <Text style={styles.label}>Condition Score</Text>
-                <Text style={styles.value}>{data.conditionScore} / 9</Text>
+                <Text style={styles.value}>{data.conditionScore}</Text>
               </View>
             </View>
           </View>
@@ -363,8 +372,7 @@ export function TradeEvaluationPDF({
         {/* Footer */}
         <View style={styles.footer} fixed>
           <Text>
-            Bish&apos;s RV | Trade-In Evaluation | Stock: {data.stockNumber || 'N/A'} |
-            Generated: {dateStr}
+            Bish&apos;s RV | Trade-In Evaluation | Stock: {data.stockNumber || 'N/A'} | {metadataStr}
           </Text>
         </View>
       </Page>

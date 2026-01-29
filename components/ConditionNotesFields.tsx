@@ -71,6 +71,9 @@ export default function ConditionNotesFields({
             }}
           />
         </div>
+        <p className="mt-1 text-xs text-gray-500">
+          $1500 is the average additional service costs for a unit (does not include prep or recon)
+        </p>
       </Field>
     </div>
   );

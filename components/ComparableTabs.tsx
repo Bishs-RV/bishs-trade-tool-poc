@@ -24,8 +24,9 @@ interface ComparableTabsProps {
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return '----'
   const date = new Date(dateStr)
-  if (isNaN(date.getTime())) return '----'
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  return isNaN(date.getTime())
+    ? '----'
+    : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function EmptyState({ message }: { message: string }) {
@@ -121,6 +122,7 @@ export default function ComparableTabs({
                   <TableHead className="text-xs">Location</TableHead>
                   <TableHead className="text-xs">Year</TableHead>
                   <TableHead className="text-xs">Listed Price</TableHead>
+                  <TableHead className="text-xs">Days on Lot</TableHead>
                   <TableHead className="text-xs">Stock #</TableHead>
                 </TableRow>
               </TableHeader>
@@ -131,6 +133,9 @@ export default function ComparableTabs({
                     <TableCell className="py-2">{unit.year || '----'}</TableCell>
                     <TableCell className="py-2 font-medium">
                       {unit.listedPrice ? formatCurrency(unit.listedPrice) : '----'}
+                    </TableCell>
+                    <TableCell className="py-2">
+                      {unit.daysOnLot != null ? `${unit.daysOnLot} days` : '----'}
                     </TableCell>
                     <TableCell className="py-2 text-gray-600">
                       {unit.stockNumber || '----'}

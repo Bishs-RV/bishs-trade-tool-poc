@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,8 @@ interface PriorEvaluationsDialogProps {
   onOpenChange: (open: boolean) => void;
   vin: string;
   stockNumber: string;
+  customerName: string;
+  customerPhone: string;
   onLoadEvaluation: (evaluation: TradeEvaluation) => void;
 }
 
@@ -23,12 +25,13 @@ export default function PriorEvaluationsDialog({
   onOpenChange,
   vin,
   stockNumber,
+  customerName,
+  customerPhone,
   onLoadEvaluation,
 }: PriorEvaluationsDialogProps) {
   const [evaluations, setEvaluations] = useState<TradeEvaluation[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const hasSearchedRef = useRef(false);
 
   const handleSearch = useCallback(async () => {
     setIsLoading(true);
@@ -38,6 +41,8 @@ export default function PriorEvaluationsDialog({
       const params = new URLSearchParams();
       if (vin) params.set('vin', vin);
       if (stockNumber) params.set('stockNumber', stockNumber);
+      if (customerName) params.set('customerName', customerName);
+      if (customerPhone) params.set('customerPhone', customerPhone);
 
       const response = await fetch(`/api/valuations?${params}`);
       if (!response.ok) {
@@ -52,12 +57,11 @@ export default function PriorEvaluationsDialog({
     } finally {
       setIsLoading(false);
     }
-  }, [vin, stockNumber]);
+  }, [vin, stockNumber, customerName, customerPhone]);
 
   // Auto-search when dialog opens
   useEffect(() => {
-    if (open && !hasSearchedRef.current) {
-      hasSearchedRef.current = true;
+    if (open) {
       handleSearch();
     }
   }, [open, handleSearch]);
@@ -88,11 +92,23 @@ export default function PriorEvaluationsDialog({
     }).format(new Date(date));
   };
 
+  const formatCustomerName = (evaluation: TradeEvaluation) => {
+    const parts = [evaluation.customerFirstName, evaluation.customerLastName].filter(Boolean);
+    return parts.length > 0 ? parts.join(' ') : '-';
+  };
+
+  // Build search description
+  const searchTerms = [
+    vin && `VIN "${vin}"`,
+    stockNumber && `Stock "${stockNumber}"`,
+    customerName && `Name "${customerName}"`,
+    customerPhone && `Phone "${customerPhone}"`,
+  ].filter(Boolean);
+
   // Reset state when dialog closes
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
       setEvaluations([]);
-      hasSearchedRef.current = false;
       setError(null);
     }
     onOpenChange(newOpen);
@@ -100,15 +116,13 @@ export default function PriorEvaluationsDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Prior Trade Evaluations</DialogTitle>
           <DialogDescription>
-            {vin && stockNumber
-              ? `Search for VIN "${vin}" or Stock Number "${stockNumber}"`
-              : vin
-              ? `Search for VIN "${vin}"`
-              : `Search for Stock Number "${stockNumber}"`}
+            {searchTerms.length > 0
+              ? `Searching for ${searchTerms.join(' or ')}`
+              : 'Enter search criteria in Section 1'}
           </DialogDescription>
         </DialogHeader>
 
@@ -151,10 +165,10 @@ export default function PriorEvaluationsDialog({
                       Date
                     </th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-700">
-                      Year/Make/Model
+                      Customer
                     </th>
-                    <th className="px-3 py-2 text-center font-semibold text-gray-700">
-                      Condition
+                    <th className="px-3 py-2 text-left font-semibold text-gray-700">
+                      Year/Make/Model
                     </th>
                     <th className="px-3 py-2 text-right font-semibold text-gray-700">
                       Trade Offer
@@ -174,12 +188,15 @@ export default function PriorEvaluationsDialog({
                         {formatDate(evaluation.createdDate)}
                       </td>
                       <td className="px-3 py-2 text-gray-900">
+                        <div>{formatCustomerName(evaluation)}</div>
+                        {evaluation.customerPhone && (
+                          <div className="text-xs text-gray-500">{evaluation.customerPhone}</div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-gray-900">
                         {[evaluation.year, evaluation.make, evaluation.model]
                           .filter(Boolean)
                           .join(' ') || '-'}
-                      </td>
-                      <td className="px-3 py-2 text-center text-gray-900">
-                        {evaluation.conditionScore ?? '-'}
                       </td>
                       <td className="px-3 py-2 text-right font-medium text-gray-900">
                         {formatCurrency(evaluation.finalTradeOffer)}
@@ -199,7 +216,6 @@ export default function PriorEvaluationsDialog({
               </table>
             </div>
           )}
-
         </div>
       </DialogContent>
     </Dialog>
