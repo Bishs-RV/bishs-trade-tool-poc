@@ -27,6 +27,12 @@ Always run `npm run lint && npm run build` after making changes.
 - **Use shadcn components**: Prefer shadcn/ui for UI components to increase development speed.
 - **Path alias**: `@/*` maps to project root.
 
+## Git Workflow
+
+- **Base branch**: Always create feature branches from `staging`
+- **PR target**: All PRs should target `staging`, not `main`
+- `main` is only updated via staging merges
+
 ## Git Worktrees
 
 This repo uses git worktrees to enable parallel work on multiple features/subtasks. Each worktree is an independent working directory with its own branch.
