@@ -1,0 +1,34 @@
+// PDF-specific assets and helper functions
+
+export const BISHS_LOGO_BASE64 =
+  'data:image/png;base64,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';
+
+const CONDITION_LABELS: Record<number, string> = {
+  1: 'Very Poor',
+  2: 'Poor',
+  3: 'Below Average',
+  4: 'Fair',
+  5: 'Average',
+  6: 'Above Average',
+  7: 'Good',
+  8: 'Very Good',
+  9: 'Excellent',
+};
+
+export function getConditionLabel(score: number): string {
+  return CONDITION_LABELS[score] ?? `Score ${score}`;
+}
+
+export function getMarketDemand(monthsToSell: number): string {
+  if (monthsToSell <= 2) return 'Strong';
+  if (monthsToSell <= 5) return 'Moderate';
+  return 'Limited';
+}
+
+export function formatMonthLabel(month: string): string {
+  // month comes in as "YYYY-MM" from API — abbreviate to "Jan", "Feb", etc.
+  const [year, m] = month.split('-');
+  const date = new Date(Number(year), Number(m) - 1);
+  const short = date.toLocaleString('en-US', { month: 'short' });
+  return `${short} '${year.slice(2)}`;
+}

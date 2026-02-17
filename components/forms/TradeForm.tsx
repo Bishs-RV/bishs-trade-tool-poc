@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useMockAuth } from '@bishs-rv/bishs-global-header';
 import { toast } from 'sonner';
 import type { TradeValues, DriverId } from '@/lib/calculations';
+import type { ValuationResult } from '@/lib/bishconnect/client';
 import type { TradeData } from '@/lib/types';
+import { saveValuation } from '@/lib/save-valuation';
 import {
   useTradeStore,
   useTradeData,
@@ -16,6 +18,8 @@ import {
   useDepreciation,
   useEvaluationCreatedBy,
   useEvaluationCreatedDate,
+  useEvaluationId,
+  useTradeValues,
 } from '@/lib/store';
 import Section1UnitData from '@/components/Section1UnitData';
 import Section2Condition from '@/components/Section2Condition';
@@ -44,6 +48,8 @@ export default function TradeForm() {
   const depreciation = useDepreciation();
   const evaluationCreatedBy = useEvaluationCreatedBy();
   const evaluationCreatedDate = useEvaluationCreatedDate();
+  const evaluationId = useEvaluationId();
+  const tradeValues = useTradeValues();
 
   // Get current user name from session or mock auth
   const currentUserName = isRealAuthActive
@@ -60,6 +66,7 @@ export default function TradeForm() {
     setIsLookupComplete,
     setIsLoading,
     setIsSubmitting,
+    setEvaluationId,
     loadEvaluation,
     reset,
   } = useTradeStore();
@@ -101,6 +108,63 @@ export default function TradeForm() {
   const handleUpdate = (updates: Partial<TradeData>, driverId: DriverId = 'initial-load') => {
     updateFields(updates, driverId);
   };
+
+  // Wrap loadEvaluation to also re-fetch depreciation data from API
+  const handleLoadEvaluation = useCallback(
+    (evaluation: import('@/lib/db/schema').TradeEvaluation) => {
+      loadEvaluation(evaluation);
+
+      // Re-fetch depreciation data if we have a model trim ID
+      const modelTrimId = evaluation.jdPowerModelTrimId;
+      if (!modelTrimId) return;
+
+      const params = new URLSearchParams({
+        modelTrimId: modelTrimId.toString(),
+        condition: (evaluation.conditionScore || 7).toString(),
+      });
+      if (evaluation.mileage) params.set('mileage', evaluation.mileage.toString());
+
+      fetch(`/api/trade-value?${params}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((result) => {
+          if (!result?.valuationResults) return;
+
+          // Abort if a different unit has been loaded/looked up since
+          const storeState = useTradeStore.getState();
+          if (storeState.data.jdPowerModelTrimId !== modelTrimId) return;
+
+          const current = storeState.tradeValues;
+          if (!current) return;
+
+          // Merge depreciation fields from fresh API into existing tradeValues
+          const mergedResults: Record<string, ValuationResult> = {};
+          for (const [key, apiResult] of Object.entries(
+            result.valuationResults as Record<string, ValuationResult>
+          )) {
+            const existing = current.valuationResults?.[key];
+            mergedResults[key] = {
+              // Keep saved financial values if they exist
+              ...(existing || apiResult),
+              // Overlay fresh depreciation/market metadata from API
+              months_to_sell: apiResult.months_to_sell,
+              vehicle_age: apiResult.vehicle_age,
+              depreciation_months: apiResult.depreciation_months,
+              min_value: apiResult.min_value,
+              max_value: apiResult.max_value,
+            };
+          }
+
+          storeState.setTradeValues({
+            ...current,
+            valuationResults: mergedResults,
+          });
+        })
+        .catch((err) =>
+          console.error('Failed to fetch depreciation data:', err)
+        );
+    },
+    [loadEvaluation]
+  );
 
   const handleLookup = async () => {
     const isCustomInputMode =
@@ -170,84 +234,44 @@ export default function TradeForm() {
     }
   };
 
+  // Guard against concurrent save-on-print calls
+  const isSavingRef = useRef(false);
+
+  // Save-on-print callback: saves if not already saved
+  const handleSaveOnPrint = useCallback(async () => {
+    // Skip if already saved (via submit or prior print) or loaded evaluation
+    if (evaluationId || evaluationCreatedBy || isSavingRef.current) return;
+    isSavingRef.current = true;
+
+    try {
+      const result = await saveValuation({ data, calculated, userEmail });
+      setEvaluationId(result.evaluationId);
+      toast.success('Evaluation saved');
+      // Leave isSavingRef = true to prevent re-entry after success
+    } catch (error) {
+      console.error('Save-on-print error:', error);
+      toast.error('Failed to save evaluation on print');
+      isSavingRef.current = false; // Allow retry on failure only
+    }
+  }, [evaluationId, evaluationCreatedBy, data, calculated, userEmail, setEvaluationId]);
+
+  // Get min/max values for comparable range
+  const conditionResult = tradeValues?.valuationResults?.[data.conditionScore.toString()];
+  const minValue = conditionResult?.min_value;
+  const maxValue = conditionResult?.max_value;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Already saved via print — just show success
+    if (evaluationId) {
+      setSuccessDialogOpen(true);
+      return;
+    }
     setIsSubmitting(true);
 
     try {
-      const payload = {
-        customerFirstName: data.customerFirstName || undefined,
-        customerLastName: data.customerLastName || undefined,
-        customerPhone: data.customerPhone,
-        customerEmail: data.customerEmail || undefined,
-        stockNumber: data.stockNumber || undefined,
-        location: data.location || undefined,
-        year: data.year || undefined,
-        make: data.make || undefined,
-        model: data.model || undefined,
-        vin: data.vin || undefined,
-        rvType: data.rvType || undefined,
-        mileage: data.mileage || undefined,
-        jdPowerModelTrimId: data.jdPowerModelTrimId || undefined,
-        jdPowerManufacturerId: data.jdPowerManufacturerId || undefined,
-        conditionScore: data.conditionScore,
-        majorIssues: data.majorIssues || undefined,
-        unitAddOns: data.unitAddOns || undefined,
-        additionalPrepCost: data.additionalPrepCost || undefined,
-        avgListingPrice: data.avgListingPrice || undefined,
-        // TODO: tradeInPercent is dead code - remove after schema migration
-        tradeInPercent: data.tradeInPercent,
-        targetMarginPercent: data.targetMarginPercent,
-        retailPriceSource: data.retailPriceSource,
-        customRetailValue: data.customRetailValue || undefined,
-        jdPowerTradeIn: calculated.jdPowerTradeIn,
-        jdPowerRetailValue: calculated.jdPowerRetailValue,
-        pdiCost: calculated.pdiCost,
-        reconCost: calculated.reconCost,
-        soldPrepCost: calculated.soldPrepCost,
-        totalPrepCosts: calculated.totalPrepCosts,
-        bishTivBase: calculated.bishTIVBase,
-        totalUnitCosts: calculated.totalUnitCosts,
-        avgCompPrice: calculated.avgCompPrice,
-        calculatedRetailPrice: calculated.calculatedRetailPrice,
-        replacementCost: calculated.replacementCost,
-        activeRetailPrice: calculated.activeRetailPrice,
-        finalTradeOffer: calculated.finalTradeOffer,
-        calculatedMarginAmount: calculated.calculatedMarginAmount,
-        calculatedMarginPercent: calculated.calculatedMarginPercent,
-        valuationNotes: data.valuationNotes || undefined,
-        createdBy: userEmail,
-      };
-
-      const response = await fetch('/api/valuations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        let errorMessage = 'Failed to save valuation';
-        try {
-          const error = await response.json();
-          if (error.details) {
-            // Format validation errors
-            const fields = Object.entries(error.details)
-              .map(([field, messages]) => `${field}: ${(messages as string[]).join(', ')}`)
-              .join('; ');
-            errorMessage = fields || error.error || errorMessage;
-          } else {
-            errorMessage = error.error || errorMessage;
-          }
-        } catch {
-          // Response body is not valid JSON
-        }
-        throw new Error(errorMessage);
-      }
-
-      const result = await response.json();
-      if (!result.evaluation?.tradeEvaluationId) {
-        throw new Error('Invalid response from server');
-      }
+      const result = await saveValuation({ data, calculated, userEmail });
+      setEvaluationId(result.evaluationId);
       setSuccessDialogOpen(true);
     } catch (error) {
       console.error('Submit error:', error);
@@ -273,7 +297,7 @@ export default function TradeForm() {
             onLookup={handleLookup}
             isLookupComplete={isLookupComplete}
             isLoading={isLoading}
-            onLoadEvaluation={loadEvaluation}
+            onLoadEvaluation={handleLoadEvaluation}
           />
         </div>
 
@@ -366,6 +390,9 @@ export default function TradeForm() {
         currentUserName={currentUserName}
         createdBy={evaluationCreatedBy}
         createdDate={evaluationCreatedDate}
+        onSave={handleSaveOnPrint}
+        minValue={minValue}
+        maxValue={maxValue}
       />
 
       {/* Success Dialog */}

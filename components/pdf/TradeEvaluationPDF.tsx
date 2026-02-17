@@ -1,24 +1,27 @@
 'use client';
 
-import {
-  Document,
-  Page,
-  Text,
-  View,
-  StyleSheet,
-} from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import { TradeData, CalculatedValues, DepreciationInfo } from '@/lib/types';
 import { formatCurrency } from '@/lib/calculations';
 import { RV_TYPE_OPTIONS, isMotorized } from '@/lib/constants';
 import { DISCLOSURE_LIST } from '@/lib/disclosures';
+import { getConditionLabel, getMarketDemand } from '@/lib/pdf-assets';
+import { PDFHeader } from './PDFHeader';
+import { PDFFooter } from './PDFFooter';
+import { DepreciationChartPDF } from './DepreciationChartPDF';
 
-interface TradeEvaluationPDFProps {
+export interface TradeEvaluationPDFProps {
   data: TradeData;
   calculated: CalculatedValues;
   depreciation?: DepreciationInfo;
   generatedDate?: Date;
   userName?: string;
   storeCode?: string;
+  // Pre-fetched logo data URI
+  logoSrc?: string;
+  // Comparable range from API ValuationResult
+  minValue?: number;
+  maxValue?: number;
 }
 
 const styles = StyleSheet.create({
@@ -28,24 +31,8 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#1f2937',
   },
-  header: {
-    marginBottom: 14,
-    borderBottomWidth: 2,
-    borderBottomColor: '#374151',
-    paddingBottom: 10,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: 2,
-  },
-  headerSubtitle: {
-    fontSize: 9,
-    color: '#6b7280',
-  },
   section: {
-    marginBottom: 12,
+    marginBottom: 10,
   },
   sectionTitle: {
     fontSize: 11,
@@ -77,16 +64,109 @@ const styles = StyleSheet.create({
   column: {
     flex: 1,
   },
+  // Customer info
+  customerGrid: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 3,
+  },
+  customerItem: {
+    flex: 1,
+  },
+  customerLabel: {
+    fontSize: 7,
+    color: '#6b7280',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  customerValue: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: '#1f2937',
+  },
+  // Market snapshot
+  italicNote: {
+    fontSize: 7,
+    color: '#9ca3af',
+    fontStyle: 'italic',
+    marginTop: 4,
+  },
+  // Retail range
+  rangeBox: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 30,
+    paddingVertical: 6,
+  },
+  rangeValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#374151',
+    textAlign: 'center',
+  },
+  rangeDash: {
+    fontSize: 14,
+    color: '#9ca3af',
+    alignSelf: 'center',
+  },
+  rangeDisclaimer: {
+    fontSize: 7,
+    color: '#9ca3af',
+    fontStyle: 'italic',
+    textAlign: 'center',
+  },
+  // Dealer costs
+  costItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 3,
+    paddingHorizontal: 4,
+  },
+  costLabel: {
+    fontSize: 9,
+    color: '#374151',
+  },
+  costValue: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: '#374151',
+  },
+  costTotal: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 5,
+    paddingHorizontal: 4,
+    marginTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: '#d1d5db',
+  },
+  costTotalLabel: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#1f2937',
+  },
+  costTotalValue: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#1f2937',
+  },
+  costFraming: {
+    fontSize: 8,
+    color: '#6b7280',
+    marginBottom: 6,
+    lineHeight: 1.3,
+  },
+  // Final offer
   offerSection: {
-    backgroundColor: '#ea580c',
+    backgroundColor: '#16a34a',
     padding: 12,
-    marginVertical: 12,
+    marginVertical: 10,
     borderRadius: 4,
     alignItems: 'center',
   },
   offerLabel: {
     fontSize: 9,
-    color: '#fff7ed',
+    color: '#dcfce7',
     marginBottom: 2,
     textTransform: 'uppercase',
     letterSpacing: 1,
@@ -96,11 +176,17 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: 'white',
   },
+  offerValidity: {
+    fontSize: 7,
+    color: '#dcfce7',
+    marginTop: 4,
+  },
+  // Notes
   notesSection: {
-    marginTop: 12,
-    padding: 12,
+    padding: 10,
     backgroundColor: '#fefce8',
     borderRadius: 4,
+    marginBottom: 8,
   },
   notesLabel: {
     fontSize: 10,
@@ -109,39 +195,28 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   notesText: {
-    fontSize: 10,
+    fontSize: 9,
     color: '#713f12',
     lineHeight: 1.4,
   },
+  // Disclosures
   disclosures: {
-    marginTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-    paddingTop: 10,
-  },
-  disclosuresTitle: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#6b7280',
-    marginBottom: 6,
-  },
-  disclosureItem: {
-    fontSize: 8,
-    color: '#9ca3af',
-    marginBottom: 3,
-    lineHeight: 1.3,
-  },
-  footer: {
-    position: 'absolute',
-    bottom: 30,
-    left: 40,
-    right: 40,
-    fontSize: 8,
-    color: '#9ca3af',
-    textAlign: 'center',
+    marginTop: 8,
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
     paddingTop: 8,
+  },
+  disclosuresTitle: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: '#6b7280',
+    marginBottom: 4,
+  },
+  disclosureItem: {
+    fontSize: 7,
+    color: '#9ca3af',
+    marginBottom: 2,
+    lineHeight: 1.3,
   },
 });
 
@@ -156,6 +231,9 @@ export function TradeEvaluationPDF({
   generatedDate = new Date(),
   userName,
   storeCode,
+  logoSrc,
+  minValue,
+  maxValue,
 }: TradeEvaluationPDFProps) {
   const dateStr = generatedDate.toLocaleDateString('en-US', {
     year: 'numeric',
@@ -163,89 +241,91 @@ export function TradeEvaluationPDF({
     day: 'numeric',
   });
 
-  // Build metadata string for header/footer
   const metadataParts = [dateStr, userName, storeCode].filter(Boolean);
   const metadataStr = metadataParts.join(' | ');
 
-  const hasCustomerInfo = !!(data.customerFirstName || data.customerLastName || data.customerPhone || data.customerEmail);
-  const customerFullName = [data.customerFirstName, data.customerLastName].filter(Boolean).join(' ');
+  const customerFullName = [data.customerFirstName, data.customerLastName]
+    .filter(Boolean)
+    .join(' ');
+  const hasCustomerInfo = !!(
+    customerFullName ||
+    data.customerPhone ||
+    data.customerEmail
+  );
+
+  // Dealer cost calculations
+  const reconditioningSafety =
+    calculated.pdiCost + calculated.reconCost + data.additionalPrepCost;
+
+  // Market & Holding Costs
+  const monthsToSell = depreciation?.monthsToSell ?? 0;
+  const depreciationMonths = depreciation?.depreciationMonths;
+  let depreciationDelta = 0;
+  if (
+    depreciationMonths &&
+    monthsToSell > 0 &&
+    monthsToSell <= depreciationMonths.length
+  ) {
+    depreciationDelta = Math.max(
+      0,
+      calculated.bishTIVBase - depreciationMonths[monthsToSell - 1].amount
+    );
+  }
+  const floorPlanInterest =
+    (0.075 / 12) * monthsToSell * calculated.totalUnitCosts;
+  const marketHoldingCost = depreciationDelta + floorPlanInterest;
+
+  const totalDealerCosts = reconditioningSafety + marketHoldingCost;
+
+  const hasComparableRange =
+    minValue != null && maxValue != null && minValue > 0 && maxValue > 0;
 
   return (
     <Document>
       <Page size="LETTER" style={styles.page}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Trade-In Evaluation Summary</Text>
-          <Text style={styles.headerSubtitle}>
-            Bish&apos;s RV | {metadataStr}
-          </Text>
-        </View>
+        {/* 1. Header with logo */}
+        <PDFHeader
+          title="Trade-In Evaluation Summary"
+          metadataStr={metadataStr}
+          logoSrc={logoSrc}
+        />
 
-        {/* Customer Info & Market Analysis - side by side */}
-        {(hasCustomerInfo || depreciation?.monthsToSell !== undefined) && (
+        {/* 2. Customer Information */}
+        {hasCustomerInfo && (
           <View style={styles.section}>
-            <View style={styles.twoColumn}>
-              {/* Customer Info */}
-              {hasCustomerInfo && (
-                <View style={styles.column}>
-                  <Text style={styles.sectionTitle}>Customer Information</Text>
-                  {customerFullName && (
-                    <View style={styles.row}>
-                      <Text style={styles.label}>Name</Text>
-                      <Text style={styles.value}>{customerFullName}</Text>
-                    </View>
-                  )}
-                  {data.customerPhone && (
-                    <View style={styles.row}>
-                      <Text style={styles.label}>Phone</Text>
-                      <Text style={styles.value}>{data.customerPhone}</Text>
-                    </View>
-                  )}
-                  {data.customerEmail && (
-                    <View style={styles.row}>
-                      <Text style={styles.label}>Email</Text>
-                      <Text style={styles.value}>{data.customerEmail}</Text>
-                    </View>
-                  )}
+            <Text style={styles.sectionTitle}>Customer Information</Text>
+            <View style={styles.customerGrid}>
+              {customerFullName && (
+                <View style={styles.customerItem}>
+                  <Text style={styles.customerLabel}>Name</Text>
+                  <Text style={styles.customerValue}>{customerFullName}</Text>
                 </View>
               )}
-              {/* Market Analysis */}
-              {depreciation?.monthsToSell !== undefined && (
-                <View style={styles.column}>
-                  <Text style={styles.sectionTitle}>Market Analysis</Text>
-                  <View style={styles.row}>
-                    <Text style={styles.label}>Est. Time to Sell</Text>
-                    <Text style={styles.value}>
-                      {depreciation.monthsToSell} month{depreciation.monthsToSell !== 1 && 's'}
-                    </Text>
-                  </View>
-                  {depreciation.vehicleAge !== undefined && (
-                    <View style={styles.row}>
-                      <Text style={styles.label}>Vehicle Age</Text>
-                      <Text style={styles.value}>
-                        {depreciation.vehicleAge} year{depreciation.vehicleAge !== 1 && 's'}
-                      </Text>
-                    </View>
-                  )}
+              {data.customerPhone && (
+                <View style={styles.customerItem}>
+                  <Text style={styles.customerLabel}>Phone</Text>
+                  <Text style={styles.customerValue}>
+                    {data.customerPhone}
+                  </Text>
+                </View>
+              )}
+              {data.customerEmail && (
+                <View style={styles.customerItem}>
+                  <Text style={styles.customerLabel}>Email</Text>
+                  <Text style={styles.customerValue}>
+                    {data.customerEmail}
+                  </Text>
                 </View>
               )}
             </View>
           </View>
         )}
 
-        {/* Unit Information */}
+        {/* 3. Trade-In Vehicle Overview */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Unit Information</Text>
+          <Text style={styles.sectionTitle}>Trade-In Vehicle Overview</Text>
           <View style={styles.twoColumn}>
             <View style={styles.column}>
-              <View style={styles.row}>
-                <Text style={styles.label}>Stock Number</Text>
-                <Text style={styles.value}>{data.stockNumber || '-'}</Text>
-              </View>
-              <View style={styles.row}>
-                <Text style={styles.label}>Location</Text>
-                <Text style={styles.value}>{data.location || '-'}</Text>
-              </View>
               <View style={styles.row}>
                 <Text style={styles.label}>Year / Make / Model</Text>
                 <Text style={styles.value}>
@@ -256,12 +336,14 @@ export function TradeEvaluationPDF({
                 <Text style={styles.label}>VIN</Text>
                 <Text style={styles.value}>{data.vin || '-'}</Text>
               </View>
-            </View>
-            <View style={styles.column}>
               <View style={styles.row}>
                 <Text style={styles.label}>RV Type</Text>
-                <Text style={styles.value}>{getRVTypeLabel(data.rvType)}</Text>
+                <Text style={styles.value}>
+                  {getRVTypeLabel(data.rvType)}
+                </Text>
               </View>
+            </View>
+            <View style={styles.column}>
               {isMotorized(data.rvType) && (
                 <View style={styles.row}>
                   <Text style={styles.label}>Mileage</Text>
@@ -271,87 +353,148 @@ export function TradeEvaluationPDF({
                 </View>
               )}
               <View style={styles.row}>
-                <Text style={styles.label}>Condition Score</Text>
-                <Text style={styles.value}>{data.conditionScore}</Text>
+                <Text style={styles.label}>Overall Condition</Text>
+                <Text style={styles.value}>
+                  {getConditionLabel(data.conditionScore)}
+                </Text>
               </View>
             </View>
           </View>
         </View>
 
-        {/* Valuation Summary */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Valuation Summary</Text>
-          <View style={styles.twoColumn}>
-            <View style={styles.column}>
-              <View style={styles.row}>
-                <Text style={styles.label}>JD Power Trade-In</Text>
-                <Text style={styles.value}>
-                  {formatCurrency(calculated.jdPowerTradeIn)}
-                </Text>
-              </View>
-              <View style={styles.row}>
-                <Text style={styles.label}>JD Power Retail Value</Text>
-                <Text style={styles.value}>
-                  {formatCurrency(calculated.jdPowerRetailValue)}
-                </Text>
-              </View>
-              <View style={styles.row}>
-                <Text style={styles.label}>Bish&apos;s TIV Base</Text>
-                <Text style={styles.value}>
-                  {formatCurrency(calculated.bishTIVBase)}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.column}>
-              <View style={styles.row}>
-                <Text style={styles.label}>PDI Cost</Text>
-                <Text style={styles.value}>
-                  {formatCurrency(calculated.pdiCost)}
-                </Text>
-              </View>
-              <View style={styles.row}>
-                <Text style={styles.label}>Recon Cost</Text>
-                <Text style={styles.value}>
-                  {formatCurrency(calculated.reconCost)}
-                </Text>
-              </View>
-              <View style={styles.row}>
-                <Text style={styles.label}>Sold Prep Cost</Text>
-                <Text style={styles.value}>
-                  {formatCurrency(calculated.soldPrepCost)}
-                </Text>
-              </View>
-              {data.additionalPrepCost > 0 && (
+        {/* 4. Current Market Snapshot */}
+        {depreciation?.monthsToSell !== undefined && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Current Market Snapshot</Text>
+            <View style={styles.twoColumn}>
+              {/* Left: market data */}
+              <View style={styles.column}>
+                {depreciation.vehicleAge !== undefined && (
+                  <View style={styles.row}>
+                    <Text style={styles.label}>Vehicle Age</Text>
+                    <Text style={styles.value}>
+                      {depreciation.vehicleAge} year
+                      {depreciation.vehicleAge !== 1 && 's'}
+                    </Text>
+                  </View>
+                )}
                 <View style={styles.row}>
-                  <Text style={styles.label}>Additional Costs</Text>
+                  <Text style={styles.label}>Est. Time to Resell</Text>
                   <Text style={styles.value}>
-                    {formatCurrency(data.additionalPrepCost)}
+                    Approximately {depreciation.monthsToSell} month
+                    {depreciation.monthsToSell !== 1 && 's'}
                   </Text>
                 </View>
-              )}
-              <View style={styles.row}>
-                <Text style={styles.label}>Total Prep Costs</Text>
-                <Text style={styles.value}>
-                  {formatCurrency(calculated.totalPrepCosts)}
-                </Text>
+                <View style={styles.row}>
+                  <Text style={styles.label}>Market Demand</Text>
+                  <Text style={styles.value}>
+                    {getMarketDemand(depreciation.monthsToSell ?? 0)}
+                  </Text>
+                </View>
+              </View>
+              {/* Right: depreciation chart */}
+              <View style={styles.column}>
+                {depreciationMonths && depreciationMonths.length >= 2 ? (
+                  <DepreciationChartPDF data={depreciationMonths} />
+                ) : (
+                  <Text
+                    style={{
+                      fontSize: 8,
+                      color: '#9ca3af',
+                      fontStyle: 'italic',
+                      paddingVertical: 20,
+                      textAlign: 'center',
+                    }}
+                  >
+                    Depreciation chart not available
+                  </Text>
+                )}
               </View>
             </View>
+            <Text style={styles.italicNote}>
+              Market data is based on current sales trends and comparable units
+              in our region.
+            </Text>
           </View>
-          <View style={[styles.row, { marginTop: 8, borderTopWidth: 1, borderTopColor: '#e5e7eb', paddingTop: 8 }]}>
-            <Text style={[styles.label, { fontWeight: 'bold' }]}>Total Bank Cost</Text>
-            <Text style={[styles.value, { fontSize: 11 }]}>{formatCurrency(calculated.totalUnitCosts)}</Text>
+        )}
+
+        {/* 5. Estimated Retail Market Range */}
+        {hasComparableRange && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              Estimated Retail Market Range
+            </Text>
+            <View style={styles.rangeBox}>
+              <Text style={styles.rangeValue}>
+                {formatCurrency(minValue!)}
+              </Text>
+              <Text style={styles.rangeDash}>—</Text>
+              <Text style={styles.rangeValue}>
+                {formatCurrency(maxValue!)}
+              </Text>
+            </View>
+            <Text style={styles.rangeDisclaimer}>
+              Based on comparable listings. Asking prices may differ from actual
+              selling prices.
+            </Text>
+          </View>
+        )}
+
+        {/* 6. Dealer Costs Required to Resell */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            Dealer Costs Required to Resell
+          </Text>
+          <Text style={styles.costFraming}>
+            Before we can offer your trade-in for resale, the following costs are
+            required to prepare, certify, and hold the unit:
+          </Text>
+
+          <View style={styles.costItem}>
+            <Text style={styles.costLabel}>
+              Reconditioning & Safety Certification
+            </Text>
+            <Text style={styles.costValue}>
+              {formatCurrency(reconditioningSafety)}
+            </Text>
+          </View>
+
+          <View style={styles.costItem}>
+            <Text style={styles.costLabel}>Market & Holding Costs</Text>
+            <Text style={styles.costValue}>
+              {formatCurrency(marketHoldingCost)}
+            </Text>
+          </View>
+
+          <View style={styles.costItem}>
+            <Text style={styles.costLabel}>Administrative & Compliance</Text>
+            <Text style={{ fontSize: 8, color: '#9ca3af', fontStyle: 'italic' }}>
+              Included
+            </Text>
+          </View>
+
+          <View style={styles.costTotal}>
+            <Text style={styles.costTotalLabel}>
+              Total Estimated Dealer Costs
+            </Text>
+            <Text style={styles.costTotalValue}>
+              {formatCurrency(totalDealerCosts)}
+            </Text>
           </View>
         </View>
 
-        {/* Final Offer (Prominent) */}
+        {/* 7. Final Trade-In Offer */}
         <View style={styles.offerSection}>
           <Text style={styles.offerLabel}>Final Trade-In Offer</Text>
           <Text style={styles.offerValue}>
             {formatCurrency(calculated.finalTradeOffer)}
           </Text>
+          <Text style={styles.offerValidity}>
+            This offer is valid for 7 calendar days from the date above.
+          </Text>
         </View>
 
-        {/* Notes Section (if provided) */}
+        {/* 8. Valuation Notes */}
         {data.valuationNotes && (
           <View style={styles.notesSection}>
             <Text style={styles.notesLabel}>Valuation Notes</Text>
@@ -359,7 +502,7 @@ export function TradeEvaluationPDF({
           </View>
         )}
 
-        {/* Disclosures */}
+        {/* 9. Important Disclosures */}
         <View style={styles.disclosures}>
           <Text style={styles.disclosuresTitle}>Important Disclosures</Text>
           {DISCLOSURE_LIST.map((disclosure, index) => (
@@ -369,13 +512,10 @@ export function TradeEvaluationPDF({
           ))}
         </View>
 
-        {/* Footer */}
-        <View style={styles.footer} fixed>
-          <Text>
-            Bish&apos;s RV | Trade-In Evaluation | Stock: {data.stockNumber || 'N/A'} | {metadataStr}
-          </Text>
-        </View>
+        {/* 10. Footer */}
+        <PDFFooter stockNumber={data.stockNumber} metadataStr={metadataStr} />
       </Page>
+
     </Document>
   );
 }
