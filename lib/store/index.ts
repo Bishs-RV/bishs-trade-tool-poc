@@ -10,4 +10,5 @@ export {
   useIsLoadingPriorEval,
   useEvaluationCreatedBy,
   useEvaluationCreatedDate,
+  useEvaluationId,
 } from './trade-store';

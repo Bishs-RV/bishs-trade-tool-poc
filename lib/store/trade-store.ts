@@ -84,6 +84,8 @@ interface TradeState {
   // Metadata from loaded evaluation (undefined for new evaluations)
   evaluationCreatedBy: string | undefined;
   evaluationCreatedDate: Date | undefined;
+  // Tracks saved evaluation ID (prevents double-save on print)
+  evaluationId: number | null;
 }
 
 interface TradeActions {
@@ -109,6 +111,8 @@ interface TradeActions {
   setIsLoading: (value: boolean) => void;
   // Set submitting state
   setIsSubmitting: (value: boolean) => void;
+  // Set evaluation ID after save
+  setEvaluationId: (id: number | null) => void;
   // Load saved evaluation
   loadEvaluation: (evaluation: TradeEvaluation) => void;
   // Full reset to initial state
@@ -128,6 +132,7 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
   isLoadingPriorEval: false,
   evaluationCreatedBy: undefined,
   evaluationCreatedDate: undefined,
+  evaluationId: null,
 
   // Actions
   updateField: (field, value, driverId = 'trade-in-percent-slider') => {
@@ -300,6 +305,7 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
       calculated: newCalc,
       evaluationCreatedBy: undefined,
       evaluationCreatedDate: undefined,
+      evaluationId: null,
     });
   },
 
@@ -337,6 +343,10 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
 
   setIsSubmitting: (value) => {
     set({ isSubmitting: value });
+  },
+
+  setEvaluationId: (id) => {
+    set({ evaluationId: id });
   },
 
   loadEvaluation: (evaluation) => {
@@ -420,6 +430,7 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
       tradeValues: loadedTradeValues,
       evaluationCreatedBy: evaluation.createdBy,
       evaluationCreatedDate: evaluation.createdDate,
+      evaluationId: evaluation.tradeEvaluationId,
     });
 
     // Clear the flag after effects have run
@@ -445,6 +456,7 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
       isLoadingPriorEval: false,
       evaluationCreatedBy: undefined,
       evaluationCreatedDate: undefined,
+      evaluationId: null,
     });
   },
 }));
@@ -472,5 +484,8 @@ export const useDepreciation = () => {
     monthsToSell: result.months_to_sell,
     vehicleAge: result.vehicle_age,
     totalDepreciationPercent: result.total_depreciation_percentage,
+    depreciationMonths: result.depreciation_months,
   };
 };
+
+export const useEvaluationId = () => useTradeStore((state) => state.evaluationId);

@@ -146,11 +146,11 @@ export default function FinancialMetricsGrid({
         </div>
 
         {/* 3. Final Trade-in Offer (PROMINENT HIGHLIGHT) */}
-        <div className="relative overflow-hidden p-4 bg-gradient-to-br from-orange-500 via-orange-600 to-orange-700 rounded-xl shadow-xl border-2 border-orange-400 flex flex-col justify-center items-center transform hover:scale-105 transition-all duration-300">
+        <div className="relative overflow-hidden p-4 bg-gradient-to-br from-green-500 via-green-600 to-green-700 rounded-xl shadow-xl border-2 border-green-400 flex flex-col justify-center items-center transform hover:scale-105 transition-all duration-300">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.3),transparent_50%)]" />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,rgba(0,0,0,0.2),transparent_50%)]" />
           <div className="relative z-10 text-center">
-            <span className="block text-xs font-black text-orange-100 uppercase tracking-wider mb-0.5">
+            <span className="block text-xs font-black text-green-100 uppercase tracking-wider mb-0.5">
               Final Trade Offer
             </span>
             <span className="block font-black text-2xl text-white leading-tight drop-shadow-xl">
@@ -159,7 +159,7 @@ export default function FinancialMetricsGrid({
             <div className="mt-2 h-1 w-20 mx-auto bg-white/50 rounded-full" />
             {/* Metadata: Date | User | Store */}
             {(userName || location) && (
-              <p className="mt-2 text-xs text-orange-100/80 font-medium">
+              <p className="mt-2 text-xs text-green-100/80 font-medium">
                 {[dateStr, userName, location].filter(Boolean).join(' | ')}
               </p>
             )}

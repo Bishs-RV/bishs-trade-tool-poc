@@ -13,6 +13,9 @@ interface StickyActionBarProps {
   currentUserName?: string;
   createdBy?: string;
   createdDate?: Date;
+  onSave?: () => Promise<void>;
+  minValue?: number;
+  maxValue?: number;
 }
 
 export default function StickyActionBar({
@@ -24,6 +27,9 @@ export default function StickyActionBar({
   currentUserName,
   createdBy,
   createdDate,
+  onSave,
+  minValue,
+  maxValue,
 }: StickyActionBarProps) {
   if (isLocked) return null;
 
@@ -36,6 +42,9 @@ export default function StickyActionBar({
         currentUserName={currentUserName}
         createdBy={createdBy}
         createdDate={createdDate}
+        onSave={onSave}
+        minValue={minValue}
+        maxValue={maxValue}
       />
       <Button
         type="submit"
