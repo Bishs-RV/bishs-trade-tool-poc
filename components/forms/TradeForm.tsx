@@ -76,9 +76,6 @@ export default function TradeForm() {
   // Success dialog state
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
 
-  // User's location zipcode for RVTrader search
-  const [userZipCode, setUserZipCode] = useState<string | null>(null);
-
   // Initial calculation on mount
   useEffect(() => {
     recalculate('initial-load');
@@ -94,9 +91,6 @@ export default function TradeForm() {
           const result = await response.json();
           if (result.location) {
             updateField('location', result.location);
-          }
-          if (result.zipCode) {
-            setUserZipCode(result.zipCode);
           }
         }
       } catch (error) {
@@ -332,7 +326,6 @@ export default function TradeForm() {
               data={data}
               onUpdate={(updates) => updateFields(updates, 'avg-listing-price')}
               isLocked={!isLookupComplete}
-              zipCode={userZipCode}
             />
           </div>
 
@@ -357,7 +350,7 @@ export default function TradeForm() {
                 className="resize-none flex-1 min-h-[100px]"
                 placeholder="Negotiations, sign-off, special terms..."
                 value={data.valuationNotes}
-                onChange={(e) => updateFields({ valuationNotes: e.target.value })}
+                onChange={(e) => updateFields({ valuationNotes: e.target.value }, 'initial-load')}
                 disabled={!isLookupComplete}
               />
             </div>

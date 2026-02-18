@@ -57,9 +57,9 @@ export async function GET(request: NextRequest) {
   const yearStr = searchParams.get('year')
   const yearRangeStr = searchParams.get('yearRange')
 
-  if (!model || !yearStr) {
+  if (!model || !yearStr || (!make && !manufacturer)) {
     return NextResponse.json(
-      { error: 'model and year are required' },
+      { error: 'model, year, and at least one of make/manufacturer are required' },
       { status: 400 }
     )
   }
@@ -101,7 +101,9 @@ export async function GET(request: NextRequest) {
         listingDate: evoMajorunit.dateReceived,
         stockNumber: evoMajorunit.stockNumber,
         vin: evoMajorunit.vin,
-        daysOnLot: sql<number | null>`EXTRACT(DAY FROM NOW() - ${evoMajorunit.dateReceived})::INTEGER`.as('days_on_lot'),
+        newUsed: evoMajorunit.newUsed,
+        region: locationDetail.region,
+        daysOnLot: sql<number | null>`(NOW()::date - ${evoMajorunit.dateReceived}::date)`.as('days_on_lot'),
       })
       .from(evoMajorunit)
       .leftJoin(
@@ -141,10 +143,12 @@ export async function GET(request: NextRequest) {
         listingDate: evoSalesdealdetailunits.dateReceived,
         stockNumber: evoSalesdealdetailunits.stocknumber,
         vin: evoSalesdealdetailunits.vin,
+        newUsed: evoSalesdealdetailunits.newused,
+        region: locationDetail.region,
         salesDealId: evoSalesdealdetailunits.salesDealId,
         soldDate: evoSalesdealdetail.deliveryDate,
         location: locationDetail.location,
-        daysToSale: sql<number | null>`EXTRACT(DAY FROM ${evoSalesdealdetail.deliveryDate} - ${evoSalesdealdetailunits.dateReceived})::INTEGER`.as('days_to_sale'),
+        daysToSale: sql<number | null>`(${evoSalesdealdetail.deliveryDate}::date - ${evoSalesdealdetailunits.dateReceived}::date)`.as('days_to_sale'),
       })
       .from(evoSalesdealdetailunits)
       .innerJoin(
@@ -188,6 +192,8 @@ export async function GET(request: NextRequest) {
       daysOnLot: unit.daysOnLot,
       stockNumber: unit.stockNumber,
       vin: unit.vin,
+      newUsed: unit.newUsed ?? null,
+      region: unit.region ?? null,
     }))
 
     const soldUnits: HistoricalComparable[] = soldFromDealsRaw.map(unit => ({
@@ -204,6 +210,8 @@ export async function GET(request: NextRequest) {
       daysToSale: unit.daysToSale,
       stockNumber: unit.stockNumber,
       vin: unit.vin,
+      newUsed: unit.newUsed ?? null,
+      region: unit.region ?? null,
     }))
 
     const listedPrices = listedUnits
