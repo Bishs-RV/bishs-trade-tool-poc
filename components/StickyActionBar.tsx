@@ -7,6 +7,7 @@ import { TradeData, CalculatedValues, DepreciationInfo } from '@/lib/types';
 interface StickyActionBarProps {
   isLocked: boolean;
   isSubmitting: boolean;
+  isRefreshingDepreciation?: boolean;
   data: TradeData;
   calculated: CalculatedValues;
   depreciation?: DepreciationInfo;
@@ -21,6 +22,7 @@ interface StickyActionBarProps {
 export default function StickyActionBar({
   isLocked,
   isSubmitting,
+  isRefreshingDepreciation = false,
   data,
   calculated,
   depreciation,
@@ -39,6 +41,7 @@ export default function StickyActionBar({
         data={data}
         calculated={calculated}
         depreciation={depreciation}
+        disabled={isRefreshingDepreciation}
         currentUserName={currentUserName}
         createdBy={createdBy}
         createdDate={createdDate}
