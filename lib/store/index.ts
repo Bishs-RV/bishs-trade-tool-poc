@@ -11,4 +11,5 @@ export {
   useEvaluationCreatedBy,
   useEvaluationCreatedDate,
   useEvaluationId,
+  useIsRefreshingDepreciation,
 } from './trade-store';

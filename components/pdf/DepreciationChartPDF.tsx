@@ -8,6 +8,10 @@ import { formatMonthLabel } from '@/lib/pdf-assets';
 const styles = StyleSheet.create({
   container: {
     marginTop: 4,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 3,
+    padding: 4,
   },
   fallback: {
     fontSize: 9,
@@ -15,6 +19,18 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     textAlign: 'center',
     paddingVertical: 20,
+  },
+  chartTitle: {
+    fontSize: 8,
+    fontWeight: 'bold',
+    color: '#374151',
+    marginBottom: 2,
+  },
+  chartSubtitle: {
+    fontSize: 7,
+    color: '#9ca3af',
+    fontStyle: 'italic',
+    marginTop: 3,
   },
 });
 
@@ -76,14 +92,19 @@ export function DepreciationChartPDF({
   const maxXLabels = 6;
   const step = Math.max(1, Math.ceil(data.length / maxXLabels));
 
+  // Subtitle: last month in data
+  const lastMonth = data[data.length - 1].month;
+  const subtitleDate = formatSubtitleDate(lastMonth);
+
   return (
     <View style={styles.container}>
+      <Text style={styles.chartTitle}>Value Depreciation Over Time</Text>
       <Svg width={width} height={height}>
         {/* Background */}
         <Rect x={ml} y={mt} width={chartW} height={chartH} fill="#f9fafb" />
 
         {/* Y-axis gridlines and labels */}
-        {yTicks.map((tick, i) => {
+        {yTicks.filter((tick) => tick >= yMin && tick <= yMax).map((tick, i) => {
           const y = scaleY(tick);
           return (
             <React.Fragment key={`ytick-${i}`}>
@@ -140,6 +161,9 @@ export function DepreciationChartPDF({
           );
         })}
       </Svg>
+      <Text style={styles.chartSubtitle}>
+        Monthly depreciation trend through {subtitleDate}
+      </Text>
     </View>
   );
 }
@@ -171,4 +195,10 @@ function formatTick(value: number): string {
     return `$${k % 1 === 0 ? k.toFixed(0) : k.toFixed(1)}k`;
   }
   return `$${value.toFixed(0)}`;
+}
+
+function formatSubtitleDate(monthStr: string): string {
+  const [year, month] = monthStr.split('-').map(Number);
+  const date = new Date(year, month - 1, 1);
+  return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 }

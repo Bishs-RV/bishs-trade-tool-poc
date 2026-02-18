@@ -26,20 +26,21 @@ export interface TradeEvaluationPDFProps {
 
 const styles = StyleSheet.create({
   page: {
-    padding: 30,
+    paddingHorizontal: 30,
+    paddingVertical: 24,
     fontFamily: 'Helvetica',
     fontSize: 10,
     color: '#1f2937',
   },
   section: {
-    marginBottom: 10,
+    marginBottom: 6,
   },
   sectionTitle: {
     fontSize: 11,
     fontWeight: 'bold',
     backgroundColor: '#f3f4f6',
-    padding: 5,
-    marginBottom: 6,
+    padding: 3,
+    marginBottom: 4,
     color: '#374151',
   },
   row: {
@@ -64,26 +65,6 @@ const styles = StyleSheet.create({
   column: {
     flex: 1,
   },
-  // Customer info
-  customerGrid: {
-    flexDirection: 'row',
-    gap: 16,
-    marginBottom: 3,
-  },
-  customerItem: {
-    flex: 1,
-  },
-  customerLabel: {
-    fontSize: 7,
-    color: '#6b7280',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  customerValue: {
-    fontSize: 9,
-    fontWeight: 'bold',
-    color: '#1f2937',
-  },
   // Market snapshot
   italicNote: {
     fontSize: 7,
@@ -91,12 +72,18 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginTop: 4,
   },
+  italicNoteSpaced: {
+    fontSize: 7,
+    color: '#9ca3af',
+    fontStyle: 'italic',
+    marginTop: 8,
+  },
   // Retail range
   rangeBox: {
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 30,
-    paddingVertical: 6,
+    paddingVertical: 3,
   },
   rangeValue: {
     fontSize: 14,
@@ -159,8 +146,8 @@ const styles = StyleSheet.create({
   // Final offer
   offerSection: {
     backgroundColor: '#16a34a',
-    padding: 12,
-    marginVertical: 10,
+    padding: 8,
+    marginVertical: 6,
     borderRadius: 4,
     alignItems: 'center',
   },
@@ -172,7 +159,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   offerValue: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: 'white',
   },
@@ -201,10 +188,10 @@ const styles = StyleSheet.create({
   },
   // Disclosures
   disclosures: {
-    marginTop: 8,
+    marginTop: 4,
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
-    paddingTop: 8,
+    paddingTop: 4,
   },
   disclosuresTitle: {
     fontSize: 9,
@@ -215,13 +202,44 @@ const styles = StyleSheet.create({
   disclosureItem: {
     fontSize: 7,
     color: '#9ca3af',
-    marginBottom: 2,
+    marginBottom: 1,
     lineHeight: 1.3,
   },
 });
 
 function getRVTypeLabel(rvType: string) {
   return RV_TYPE_OPTIONS.find((opt) => opt.value === rvType)?.label || rvType;
+}
+
+function VehicleOverviewRows({ data }: { data: TradeData }) {
+  return (
+    <>
+      <View style={styles.row}>
+        <Text style={styles.label}>Year / Make / Model</Text>
+        <Text style={styles.value}>
+          {data.year || '-'} {data.make} {data.model}
+        </Text>
+      </View>
+      <View style={styles.row}>
+        <Text style={styles.label}>VIN</Text>
+        <Text style={styles.value}>{data.vin || '-'}</Text>
+      </View>
+      <View style={styles.row}>
+        <Text style={styles.label}>RV Type</Text>
+        <Text style={styles.value}>{getRVTypeLabel(data.rvType)}</Text>
+      </View>
+      {isMotorized(data.rvType) && (
+        <View style={styles.row}>
+          <Text style={styles.label}>Mileage</Text>
+          <Text style={styles.value}>{data.mileage?.toLocaleString() || '-'}</Text>
+        </View>
+      )}
+      <View style={styles.row}>
+        <Text style={styles.label}>Overall Condition</Text>
+        <Text style={styles.value}>{getConditionLabel(data.conditionScore)}</Text>
+      </View>
+    </>
+  );
 }
 
 export function TradeEvaluationPDF({
@@ -290,85 +308,55 @@ export function TradeEvaluationPDF({
           logoSrc={logoSrc}
         />
 
-        {/* 2. Customer Information */}
-        {hasCustomerInfo && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Customer Information</Text>
-            <View style={styles.customerGrid}>
-              {customerFullName && (
-                <View style={styles.customerItem}>
-                  <Text style={styles.customerLabel}>Name</Text>
-                  <Text style={styles.customerValue}>{customerFullName}</Text>
-                </View>
-              )}
-              {data.customerPhone && (
-                <View style={styles.customerItem}>
-                  <Text style={styles.customerLabel}>Phone</Text>
-                  <Text style={styles.customerValue}>
-                    {data.customerPhone}
-                  </Text>
-                </View>
-              )}
-              {data.customerEmail && (
-                <View style={styles.customerItem}>
-                  <Text style={styles.customerLabel}>Email</Text>
-                  <Text style={styles.customerValue}>
-                    {data.customerEmail}
-                  </Text>
-                </View>
-              )}
-            </View>
-          </View>
-        )}
-
-        {/* 3. Trade-In Vehicle Overview */}
+        {/* 2. Customer Info + Vehicle Overview (side-by-side when customer info exists) */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Trade-In Vehicle Overview</Text>
-          <View style={styles.twoColumn}>
-            <View style={styles.column}>
-              <View style={styles.row}>
-                <Text style={styles.label}>Year / Make / Model</Text>
-                <Text style={styles.value}>
-                  {data.year || '-'} {data.make} {data.model}
-                </Text>
+          {hasCustomerInfo ? (
+            <View style={styles.twoColumn}>
+              <View style={styles.column}>
+                <Text style={styles.sectionTitle}>Customer Information</Text>
+                {customerFullName && (
+                  <View style={styles.row}>
+                    <Text style={styles.label}>Name</Text>
+                    <Text style={styles.value}>{customerFullName}</Text>
+                  </View>
+                )}
+                {data.customerPhone && (
+                  <View style={styles.row}>
+                    <Text style={styles.label}>Phone</Text>
+                    <Text style={styles.value}>{data.customerPhone}</Text>
+                  </View>
+                )}
+                {data.customerEmail && (
+                  <View style={styles.row}>
+                    <Text style={styles.label}>Email</Text>
+                    <Text style={styles.value}>{data.customerEmail}</Text>
+                  </View>
+                )}
               </View>
-              <View style={styles.row}>
-                <Text style={styles.label}>VIN</Text>
-                <Text style={styles.value}>{data.vin || '-'}</Text>
-              </View>
-              <View style={styles.row}>
-                <Text style={styles.label}>RV Type</Text>
-                <Text style={styles.value}>
-                  {getRVTypeLabel(data.rvType)}
-                </Text>
+              <View style={styles.column}>
+                <Text style={styles.sectionTitle}>Trade-In Vehicle Overview</Text>
+                <VehicleOverviewRows data={data} />
               </View>
             </View>
-            <View style={styles.column}>
-              {isMotorized(data.rvType) && (
-                <View style={styles.row}>
-                  <Text style={styles.label}>Mileage</Text>
-                  <Text style={styles.value}>
-                    {data.mileage?.toLocaleString() || '-'}
-                  </Text>
+          ) : (
+            <>
+              <Text style={styles.sectionTitle}>Trade-In Vehicle Overview</Text>
+              <View style={styles.twoColumn}>
+                <View style={styles.column}>
+                  <VehicleOverviewRows data={data} />
                 </View>
-              )}
-              <View style={styles.row}>
-                <Text style={styles.label}>Overall Condition</Text>
-                <Text style={styles.value}>
-                  {getConditionLabel(data.conditionScore)}
-                </Text>
               </View>
-            </View>
-          </View>
+            </>
+          )}
         </View>
 
-        {/* 4. Current Market Snapshot */}
+        {/* 3. Current Market Snapshot */}
         {depreciation?.monthsToSell !== undefined && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Current Market Snapshot</Text>
             <View style={styles.twoColumn}>
-              {/* Left: market data */}
+              {/* Left: header + market data */}
               <View style={styles.column}>
+                <Text style={styles.sectionTitle}>Current Market Snapshot</Text>
                 {depreciation.vehicleAge !== undefined && (
                   <View style={styles.row}>
                     <Text style={styles.label}>Vehicle Age</Text>
@@ -392,10 +380,10 @@ export function TradeEvaluationPDF({
                   </Text>
                 </View>
               </View>
-              {/* Right: depreciation chart */}
+              {/* Right: depreciation chart (inline with header) */}
               <View style={styles.column}>
                 {depreciationMonths && depreciationMonths.length >= 2 ? (
-                  <DepreciationChartPDF data={depreciationMonths} />
+                  <DepreciationChartPDF data={depreciationMonths} height={110} />
                 ) : (
                   <Text
                     style={{
@@ -411,14 +399,14 @@ export function TradeEvaluationPDF({
                 )}
               </View>
             </View>
-            <Text style={styles.italicNote}>
-              Market data is based on current sales trends and comparable units
-              in our region.
+            <Text style={styles.italicNoteSpaced}>
+              As RVs age, resale timelines and preparation requirements
+              increase, which impacts overall trade-in value.
             </Text>
           </View>
         )}
 
-        {/* 5. Estimated Retail Market Range */}
+        {/* 4. Estimated Retail Market Range */}
         {hasComparableRange && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>
@@ -440,7 +428,7 @@ export function TradeEvaluationPDF({
           </View>
         )}
 
-        {/* 6. Dealer Costs Required to Resell */}
+        {/* 5. Dealer Costs Required to Resell */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>
             Dealer Costs Required to Resell
@@ -466,13 +454,6 @@ export function TradeEvaluationPDF({
             </Text>
           </View>
 
-          <View style={styles.costItem}>
-            <Text style={styles.costLabel}>Administrative & Compliance</Text>
-            <Text style={{ fontSize: 8, color: '#9ca3af', fontStyle: 'italic' }}>
-              Included
-            </Text>
-          </View>
-
           <View style={styles.costTotal}>
             <Text style={styles.costTotalLabel}>
               Total Estimated Dealer Costs
@@ -483,7 +464,7 @@ export function TradeEvaluationPDF({
           </View>
         </View>
 
-        {/* 7. Final Trade-In Offer */}
+        {/* 6. Final Trade-In Offer */}
         <View style={styles.offerSection}>
           <Text style={styles.offerLabel}>Final Trade-In Offer</Text>
           <Text style={styles.offerValue}>
@@ -494,7 +475,7 @@ export function TradeEvaluationPDF({
           </Text>
         </View>
 
-        {/* 8. Valuation Notes */}
+        {/* 7. Valuation Notes */}
         {data.valuationNotes && (
           <View style={styles.notesSection}>
             <Text style={styles.notesLabel}>Valuation Notes</Text>
@@ -502,7 +483,7 @@ export function TradeEvaluationPDF({
           </View>
         )}
 
-        {/* 9. Important Disclosures */}
+        {/* 8. Important Disclosures */}
         <View style={styles.disclosures}>
           <Text style={styles.disclosuresTitle}>Important Disclosures</Text>
           {DISCLOSURE_LIST.map((disclosure, index) => (
@@ -512,7 +493,7 @@ export function TradeEvaluationPDF({
           ))}
         </View>
 
-        {/* 10. Footer */}
+        {/* 9. Footer */}
         <PDFFooter stockNumber={data.stockNumber} metadataStr={metadataStr} />
       </Page>
 

@@ -9,8 +9,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderBottomWidth: 2,
     borderBottomColor: '#374151',
-    paddingBottom: 10,
-    marginBottom: 14,
+    paddingBottom: 6,
+    marginBottom: 8,
   },
   headerLeft: {
     flex: 1,

@@ -4,9 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useMockAuth } from '@bishs-rv/bishs-global-header';
 import { toast } from 'sonner';
-import type { TradeValues, DriverId } from '@/lib/calculations';
+import type { TradeValues } from '@/lib/calculations';
 import type { ValuationResult } from '@/lib/bishconnect/client';
-import type { TradeData } from '@/lib/types';
 import { saveValuation } from '@/lib/save-valuation';
 import {
   useTradeStore,
@@ -20,6 +19,7 @@ import {
   useEvaluationCreatedDate,
   useEvaluationId,
   useTradeValues,
+  useIsRefreshingDepreciation,
 } from '@/lib/store';
 import Section1UnitData from '@/components/Section1UnitData';
 import Section2Condition from '@/components/Section2Condition';
@@ -46,6 +46,7 @@ export default function TradeForm() {
   const isLoading = useIsLoading();
   const isSubmitting = useIsSubmitting();
   const depreciation = useDepreciation();
+  const isRefreshingDepreciation = useIsRefreshingDepreciation();
   const evaluationCreatedBy = useEvaluationCreatedBy();
   const evaluationCreatedDate = useEvaluationCreatedDate();
   const evaluationId = useEvaluationId();
@@ -67,6 +68,7 @@ export default function TradeForm() {
     setIsLoading,
     setIsSubmitting,
     setEvaluationId,
+    setIsRefreshingDepreciation,
     loadEvaluation,
     reset,
   } = useTradeStore();
@@ -105,10 +107,6 @@ export default function TradeForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleUpdate = (updates: Partial<TradeData>, driverId: DriverId = 'initial-load') => {
-    updateFields(updates, driverId);
-  };
-
   // Wrap loadEvaluation to also re-fetch depreciation data from API
   const handleLoadEvaluation = useCallback(
     (evaluation: import('@/lib/db/schema').TradeEvaluation) => {
@@ -117,6 +115,8 @@ export default function TradeForm() {
       // Re-fetch depreciation data if we have a model trim ID
       const modelTrimId = evaluation.jdPowerModelTrimId;
       if (!modelTrimId) return;
+
+      setIsRefreshingDepreciation(true);
 
       const params = new URLSearchParams({
         modelTrimId: modelTrimId.toString(),
@@ -161,12 +161,18 @@ export default function TradeForm() {
         })
         .catch((err) =>
           console.error('Failed to fetch depreciation data:', err)
-        );
+        )
+        .finally(() => {
+          setIsRefreshingDepreciation(false);
+        });
     },
-    [loadEvaluation]
+    [loadEvaluation, setIsRefreshingDepreciation]
   );
 
   const handleLookup = async () => {
+    // Clear stale depreciation refresh flag from any prior loaded evaluation
+    setIsRefreshingDepreciation(false);
+
     const isCustomInputMode =
       data.customManufacturer !== undefined ||
       data.customMake !== undefined ||
@@ -293,7 +299,7 @@ export default function TradeForm() {
           <Section1UnitData
             data={data}
             calculated={calculated}
-            onUpdate={(updates) => handleUpdate(updates, 'initial-load')}
+            onUpdate={(updates) => updateFields(updates, 'initial-load')}
             onLookup={handleLookup}
             isLookupComplete={isLookupComplete}
             isLoading={isLoading}
@@ -313,7 +319,7 @@ export default function TradeForm() {
                   : updates.additionalPrepCost !== undefined
                     ? 'additional-prep-cost'
                     : 'initial-load';
-              handleUpdate(updates, driverId);
+              updateFields(updates, driverId);
             }}
             isLocked={!isLookupComplete}
           />
@@ -324,7 +330,7 @@ export default function TradeForm() {
           <div className="flex-1">
             <Section3Market
               data={data}
-              onUpdate={(updates) => handleUpdate(updates, 'avg-listing-price')}
+              onUpdate={(updates) => updateFields(updates, 'avg-listing-price')}
               isLocked={!isLookupComplete}
               zipCode={userZipCode}
             />
@@ -351,7 +357,7 @@ export default function TradeForm() {
                 className="resize-none flex-1 min-h-[100px]"
                 placeholder="Negotiations, sign-off, special terms..."
                 value={data.valuationNotes}
-                onChange={(e) => handleUpdate({ valuationNotes: e.target.value })}
+                onChange={(e) => updateFields({ valuationNotes: e.target.value })}
                 disabled={!isLookupComplete}
               />
             </div>
@@ -371,7 +377,7 @@ export default function TradeForm() {
                 : updates.targetMarginPercent !== undefined
                   ? 'margin-percent-slider'
                   : 'initial-load';
-            handleUpdate(updates, driverId);
+            updateFields(updates, driverId);
           }}
           isLocked={!isLookupComplete}
           currentUserName={currentUserName}
@@ -384,6 +390,7 @@ export default function TradeForm() {
       <StickyActionBar
         isLocked={!isLookupComplete}
         isSubmitting={isSubmitting}
+        isRefreshingDepreciation={isRefreshingDepreciation}
         data={data}
         calculated={calculated}
         depreciation={depreciation}
