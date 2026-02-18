@@ -34,6 +34,7 @@ export const evoMajorunit = pgTable(
     dateReceived: timestamp('DateReceived', { withTimezone: true, mode: 'string' }),
     stockNumber: varchar('StockNumber', { length: 255 }),
     vin: varchar('VIN', { length: 255 }),
+    newUsed: varchar('NewUsed', { length: 255 }),
   },
   (table) => [
     index('idx_evo_majorunit_make_model').on(table.make, table.model),

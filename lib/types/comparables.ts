@@ -17,6 +17,8 @@ export interface HistoricalComparable {
   daysOnLot?: number | null
   stockNumber: string | null
   vin: string | null
+  newUsed: string | null
+  region: string | null
 }
 
 export interface ComparablesMetrics {
