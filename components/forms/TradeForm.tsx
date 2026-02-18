@@ -54,7 +54,7 @@ export default function TradeForm() {
 
   // Get current user name from session or mock auth
   const currentUserName = isRealAuthActive
-    ? (session.user.name ?? undefined)
+    ? (session.user.name ?? session.user.email?.split("@")[0] ?? session.user.email ?? undefined)
     : (mockAuth.user?.name ?? undefined);
 
   // Zustand store actions
