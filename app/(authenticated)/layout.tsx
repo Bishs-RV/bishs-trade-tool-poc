@@ -27,7 +27,7 @@ export default function AuthenticatedLayout({
   const isLoading = status === "loading" || mockAuth.isLoading;
 
   const handleSignOut = isRealAuthActive
-    ? () => nextAuthSignOut()
+    ? () => nextAuthSignOut({ callbackUrl: '/api/auth/federated-signout' })
     : mockAuth.signOut;
 
   const isProduction = process.env.NEXT_PUBLIC_VERCEL_ENV === "production" ||
