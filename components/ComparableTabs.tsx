@@ -299,6 +299,7 @@ export default function ComparableTabs({
                       direction={soldSortField === 'location' ? soldSortDir : null}
                       onClick={() => handleSoldSort('location')}
                     />
+                    <TableHead className="text-xs">Model</TableHead>
                     <TableHead className="text-xs">Year</TableHead>
                     <SortableHeader
                       label="Sold Price"
@@ -317,6 +318,7 @@ export default function ComparableTabs({
                   {sortedSold.map((unit) => (
                     <TableRow key={unit.id} className="text-xs">
                       <TableCell className="py-2">{unit.location || '----'}</TableCell>
+                      <TableCell className="py-2">{unit.model || '----'}</TableCell>
                       <TableCell className="py-2">{unit.year || '----'}</TableCell>
                       <TableCell className="py-2 font-medium text-green-700">
                         {unit.soldPrice ? formatCurrency(unit.soldPrice) : '----'}
@@ -350,6 +352,7 @@ export default function ComparableTabs({
                       direction={listedSortField === 'location' ? listedSortDir : null}
                       onClick={() => handleListedSort('location')}
                     />
+                    <TableHead className="text-xs">Model</TableHead>
                     <TableHead className="text-xs">Year</TableHead>
                     <SortableHeader
                       label="Listed Price"
@@ -368,6 +371,7 @@ export default function ComparableTabs({
                   {sortedListed.map((unit) => (
                     <TableRow key={unit.id} className="text-xs">
                       <TableCell className="py-2">{unit.location || '----'}</TableCell>
+                      <TableCell className="py-2">{unit.model || '----'}</TableCell>
                       <TableCell className="py-2">{unit.year || '----'}</TableCell>
                       <TableCell className="py-2 font-medium">
                         {unit.listedPrice ? formatCurrency(unit.listedPrice) : '----'}
