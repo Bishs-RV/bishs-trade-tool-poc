@@ -14,7 +14,9 @@ export async function proxy(request: NextRequest) {
   }
 
   // Azure AD is configured - enforce authentication
-  const token = await getToken({ req: request });
+  // Must pass secret explicitly to match the fallback in authOptions
+  const secret = process.env.NEXTAUTH_SECRET || 'development-secret-not-for-production';
+  const token = await getToken({ req: request, secret });
 
   if (!token) {
     const signInUrl = new URL('/api/auth/signin', request.url);
