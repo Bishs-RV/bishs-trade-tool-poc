@@ -54,6 +54,9 @@ export default function Section3Market({
       if (data.manufacturerName) {
         params.set('manufacturer', data.manufacturerName)
       }
+      if (data.rvType) {
+        params.set('rvType', data.rvType)
+      }
 
       const response = await fetch(`/api/comparables?${params}`)
       if (!response.ok) {
@@ -72,7 +75,7 @@ export default function Section3Market({
     } finally {
       setIsLoading(false)
     }
-  }, [data.make, data.manufacturerName, data.model, data.year])
+  }, [data.make, data.manufacturerName, data.model, data.year, data.rvType])
 
   useEffect(() => {
     if (!isLocked) {
