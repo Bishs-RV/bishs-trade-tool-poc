@@ -34,6 +34,8 @@ export const evoMajorunit = pgTable(
     dateReceived: timestamp('DateReceived', { withTimezone: true, mode: 'string' }),
     stockNumber: varchar('StockNumber', { length: 255 }),
     vin: varchar('VIN', { length: 255 }),
+    newUsed: varchar('NewUsed', { length: 255 }),
+    unitClass: varchar('Class', { length: 255 }),
   },
   (table) => [
     index('idx_evo_majorunit_make_model').on(table.make, table.model),
@@ -53,7 +55,7 @@ export const evoSalesdealdetail = pgTable(
     dealerId: varchar('DealerId', { length: 255 }),
     cmfId: varchar('Cmf_id', { length: 255 }),
     deliveryDate: timestamp('DeliveryDate', { withTimezone: true, mode: 'string' }),
-    stageName: varchar('StageName', { length: 255 }),
+    stageName: varchar('stagename', { length: 255 }),
   }
 )
 
@@ -78,6 +80,7 @@ export const evoSalesdealdetailunits = pgTable(
     salesDealId: varchar('SalesDeal_id', { length: 255 }).notNull(),
     stocknumber: varchar({ length: 255 }),
     vin: varchar('VIN', { length: 255 }),
+    unitClass: varchar('Class', { length: 255 }),
   },
   (table) => [
     index('idx_evo_salesdealdetailunits_make_model').on(table.make, table.model),

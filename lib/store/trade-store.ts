@@ -84,6 +84,10 @@ interface TradeState {
   // Metadata from loaded evaluation (undefined for new evaluations)
   evaluationCreatedBy: string | undefined;
   evaluationCreatedDate: Date | undefined;
+  // Tracks saved evaluation ID (prevents double-save on print)
+  evaluationId: number | null;
+  // Flag: true while re-fetching depreciation data for a loaded evaluation
+  isRefreshingDepreciation: boolean;
 }
 
 interface TradeActions {
@@ -109,6 +113,10 @@ interface TradeActions {
   setIsLoading: (value: boolean) => void;
   // Set submitting state
   setIsSubmitting: (value: boolean) => void;
+  // Set evaluation ID after save
+  setEvaluationId: (id: number | null) => void;
+  // Set depreciation refresh state
+  setIsRefreshingDepreciation: (value: boolean) => void;
   // Load saved evaluation
   loadEvaluation: (evaluation: TradeEvaluation) => void;
   // Full reset to initial state
@@ -128,6 +136,8 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
   isLoadingPriorEval: false,
   evaluationCreatedBy: undefined,
   evaluationCreatedDate: undefined,
+  evaluationId: null,
+  isRefreshingDepreciation: false,
 
   // Actions
   updateField: (field, value, driverId = 'trade-in-percent-slider') => {
@@ -200,74 +210,30 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
     const { data, isLookupComplete, tradeValues } = get();
     const newData = updates ? { ...data, ...updates } : data;
     const currentTradeValues = newTradeValues ?? tradeValues;
-
-    // Check if we have real values to calculate with
     const hasRealValues = isLookupComplete || driverId === 'lookup-complete';
+    const newCalc = calculateValuation(newData, driverId, isLookupComplete, currentTradeValues);
+    const resolvedTradeValues = newTradeValues ?? tradeValues;
 
-    // For margin-driven calculations: margin is the input, trade-in % is calculated
-    // 'lookup-complete' should also use margin as driver so trade-in % matches the 30% default
-    if (driverId === 'margin-percent-slider' || driverId === 'initial-load' || driverId === 'lookup-complete') {
-      const newCalc = calculateValuation(newData, driverId, isLookupComplete, currentTradeValues);
-
-      // Only recalculate tradeInPercent when we have real values
-      // Otherwise preserve the default (100%) to avoid setting it to 0
-      if (hasRealValues) {
-        const newTradeInPercent = calculateTradeInPercentFromMargin(
-          newCalc.bishTIVBase,
-          newCalc.finalTradeOffer
-        );
-        set({
-          data: { ...newData, tradeInPercent: newTradeInPercent },
-          calculated: newCalc,
-          tradeValues: newTradeValues ?? tradeValues,
-        });
-      } else {
-        // Before lookup: just update calculated values, preserve slider defaults
-        set({
-          data: newData,
-          calculated: newCalc,
-          tradeValues: newTradeValues ?? tradeValues,
-        });
-      }
-    } else if (driverId === 'trade-in-percent-slider') {
-      // Trade-in % slider drives: recalculate margin to match
-      const newCalc = calculateValuation(newData, driverId, isLookupComplete, currentTradeValues);
-
-      if (hasRealValues) {
-        set({
-          data: { ...newData, targetMarginPercent: newCalc.calculatedMarginPercent },
-          calculated: newCalc,
-          tradeValues: newTradeValues ?? tradeValues,
-        });
-      } else {
-        set({
-          data: newData,
-          calculated: newCalc,
-          tradeValues: newTradeValues ?? tradeValues,
-        });
-      }
+    if (driverId === 'trade-in-percent-slider') {
+      set({
+        data: hasRealValues
+          ? { ...newData, targetMarginPercent: newCalc.calculatedMarginPercent }
+          : newData,
+        calculated: newCalc,
+        tradeValues: resolvedTradeValues,
+      });
     } else {
-      // All other drivers (condition, prep cost, retail, rv-type):
-      // Use margin-driven formula, then update trade-in % to match
-      const newCalc = calculateValuation(newData, driverId, isLookupComplete, currentTradeValues);
-
-      if (hasRealValues) {
-        const newTradeInPercent = calculateTradeInPercentFromMargin(
-          newCalc.bishTIVBase,
-          newCalc.finalTradeOffer
-        );
-        set({
-          data: { ...newData, tradeInPercent: newTradeInPercent },
-          calculated: newCalc,
-          tradeValues: newTradeValues ?? tradeValues,
-        });
-      } else {
-        set({
-          data: newData,
-          calculated: newCalc,
-          tradeValues: newTradeValues ?? tradeValues,
-        });
-      }
+      // Margin-driven: initial-load, margin-percent-slider, lookup-complete, condition, prep, retail, rv-type
+      const newTradeInPercent = hasRealValues
+        ? calculateTradeInPercentFromMargin(newCalc.bishTIVBase, newCalc.finalTradeOffer)
+        : null;
+      set({
+        data: newTradeInPercent != null
+          ? { ...newData, tradeInPercent: newTradeInPercent }
+          : newData,
+        calculated: newCalc,
+        tradeValues: resolvedTradeValues,
+      });
     }
   },
 
@@ -300,6 +266,7 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
       calculated: newCalc,
       evaluationCreatedBy: undefined,
       evaluationCreatedDate: undefined,
+      evaluationId: null,
     });
   },
 
@@ -337,6 +304,14 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
 
   setIsSubmitting: (value) => {
     set({ isSubmitting: value });
+  },
+
+  setEvaluationId: (id) => {
+    set({ evaluationId: id });
+  },
+
+  setIsRefreshingDepreciation: (value) => {
+    set({ isRefreshingDepreciation: value });
   },
 
   loadEvaluation: (evaluation) => {
@@ -420,6 +395,7 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
       tradeValues: loadedTradeValues,
       evaluationCreatedBy: evaluation.createdBy,
       evaluationCreatedDate: evaluation.createdDate,
+      evaluationId: evaluation.tradeEvaluationId,
     });
 
     // Clear the flag after effects have run
@@ -443,8 +419,10 @@ export const useTradeStore = create<TradeStore>((set, get) => ({
       isLoading: false,
       isSubmitting: false,
       isLoadingPriorEval: false,
+      isRefreshingDepreciation: false,
       evaluationCreatedBy: undefined,
       evaluationCreatedDate: undefined,
+      evaluationId: null,
     });
   },
 }));
@@ -472,5 +450,9 @@ export const useDepreciation = () => {
     monthsToSell: result.months_to_sell,
     vehicleAge: result.vehicle_age,
     totalDepreciationPercent: result.total_depreciation_percentage,
+    depreciationMonths: result.depreciation_months,
   };
 };
+
+export const useEvaluationId = () => useTradeStore((state) => state.evaluationId);
+export const useIsRefreshingDepreciation = () => useTradeStore((state) => state.isRefreshingDepreciation);

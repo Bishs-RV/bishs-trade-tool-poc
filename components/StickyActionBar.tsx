@@ -7,23 +7,31 @@ import { TradeData, CalculatedValues, DepreciationInfo } from '@/lib/types';
 interface StickyActionBarProps {
   isLocked: boolean;
   isSubmitting: boolean;
+  isRefreshingDepreciation?: boolean;
   data: TradeData;
   calculated: CalculatedValues;
   depreciation?: DepreciationInfo;
   currentUserName?: string;
   createdBy?: string;
   createdDate?: Date;
+  onSave?: () => Promise<void>;
+  minValue?: number;
+  maxValue?: number;
 }
 
 export default function StickyActionBar({
   isLocked,
   isSubmitting,
+  isRefreshingDepreciation = false,
   data,
   calculated,
   depreciation,
   currentUserName,
   createdBy,
   createdDate,
+  onSave,
+  minValue,
+  maxValue,
 }: StickyActionBarProps) {
   if (isLocked) return null;
 
@@ -33,9 +41,13 @@ export default function StickyActionBar({
         data={data}
         calculated={calculated}
         depreciation={depreciation}
+        disabled={isRefreshingDepreciation}
         currentUserName={currentUserName}
         createdBy={createdBy}
         createdDate={createdDate}
+        onSave={onSave}
+        minValue={minValue}
+        maxValue={maxValue}
       />
       <Button
         type="submit"

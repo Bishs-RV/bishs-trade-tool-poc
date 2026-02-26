@@ -51,10 +51,14 @@ export interface TradeData {
 
 export type RVType = 'TT' | 'FW' | 'POP' | 'TC' | 'CAG' | 'CAD' | 'CCG' | 'CCD' | 'DT';
 
+// Re-export from API client for convenience
+export type { DepreciationMonth } from './bishconnect/client';
+
 export interface DepreciationInfo {
   monthsToSell?: number;
   vehicleAge?: number;
   totalDepreciationPercent?: number;
+  depreciationMonths?: import('./bishconnect/client').DepreciationMonth[];
 }
 
 export interface CalculatedValues {

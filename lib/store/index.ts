@@ -10,4 +10,6 @@ export {
   useIsLoadingPriorEval,
   useEvaluationCreatedBy,
   useEvaluationCreatedDate,
+  useEvaluationId,
+  useIsRefreshingDepreciation,
 } from './trade-store';

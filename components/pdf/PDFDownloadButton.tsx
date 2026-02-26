@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { pdf } from '@react-pdf/renderer';
 import { TradeData, CalculatedValues, DepreciationInfo } from '@/lib/types';
 import { TradeEvaluationPDF } from './TradeEvaluationPDF';
@@ -21,6 +21,9 @@ interface PDFDownloadButtonProps {
   currentUserName?: string;
   createdBy?: string;
   createdDate?: Date;
+  onSave?: () => Promise<void>;
+  minValue?: number;
+  maxValue?: number;
 }
 
 export function PDFDownloadButton({
@@ -31,24 +34,55 @@ export function PDFDownloadButton({
   currentUserName,
   createdBy,
   createdDate,
+  onSave,
+  minValue,
+  maxValue,
 }: PDFDownloadButtonProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [filename, setFilename] = useState('');
+
+  // Revoke blob URL on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+    };
+  }, [pdfUrl]);
 
   const handleGeneratePDF = async () => {
     setIsGenerating(true);
     const generatedDate = createdDate ? new Date(createdDate) : new Date();
 
     try {
+      // Save in parallel with PDF generation
+      const savePromise = onSave?.();
+
+      // Pre-fetch logo as data URI (react-pdf can't reliably fetch from relative URLs)
+      let logoSrc: string | undefined;
+      try {
+        const logoRes = await fetch('/bishs-logo.png');
+        if (!logoRes.ok) throw new Error(`Logo fetch failed: ${logoRes.status}`);
+        const logoBlob = await logoRes.blob();
+        logoSrc = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(logoBlob);
+        });
+      } catch {
+        console.error('Failed to load logo for PDF');
+      }
+
       // Look up creator's name for loaded evaluations
       let userName: string | undefined;
       if (createdBy) {
         try {
-          const res = await fetch(`/api/user/lookup?email=${encodeURIComponent(createdBy)}`);
+          const res = await fetch(
+            `/api/user/lookup?email=${encodeURIComponent(createdBy)}`
+          );
           if (!res.ok) throw new Error('Lookup failed');
           const userData = await res.json();
-          const fullName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim();
+          const fullName =
+            `${userData.firstName || ''} ${userData.lastName || ''}`.trim();
           userName = fullName || createdBy.split('@')[0];
         } catch (err) {
           console.error('Failed to lookup user for PDF:', err);
@@ -66,19 +100,28 @@ export function PDFDownloadButton({
           generatedDate={generatedDate}
           userName={userName}
           storeCode={data.location}
+          logoSrc={logoSrc}
+          minValue={minValue}
+          maxValue={maxValue}
         />
       ).toBlob();
 
-      const sanitize = (str: string) => str.replace(/[/\\?%*:|"<>]/g, '-');
-      const customerName = `${data.customerFirstName || ''} ${data.customerLastName || ''}`.trim();
+      // Wait for save to complete
+      await savePromise;
+
+      const sanitize = (str: string) =>
+        str.replace(/[/\\?%*:|"<>]/g, '-');
+      const customerName =
+        `${data.customerFirstName || ''} ${data.customerLastName || ''}`.trim();
       const unit = `${data.make || ''} ${data.model || ''}`.trim();
       const date = generatedDate.toISOString().split('T')[0];
 
-      const generatedFilename = [
-        sanitize(customerName) || 'Customer',
-        sanitize(unit) || 'Unit',
-        date,
-      ].join(' - ') + '.pdf';
+      const generatedFilename =
+        [
+          sanitize(customerName) || 'Customer',
+          sanitize(unit) || 'Unit',
+          date,
+        ].join(' - ') + '.pdf';
 
       const url = URL.createObjectURL(blob);
       setPdfUrl(url);
@@ -122,8 +165,9 @@ export function PDFDownloadButton({
         <span>{isGenerating ? 'Generating...' : 'Generate PDF'}</span>
       </Button>
 
+      {/* PDF Preview Dialog */}
       <Dialog open={!!pdfUrl} onOpenChange={(open) => !open && handleClose()}>
-        <DialogContent className="max-w-[65vw] sm:max-w-[65vw] h-[90vh] flex flex-col">
+        <DialogContent className="max-w-[95vw] sm:max-w-[95vw] h-[95vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Trade Evaluation PDF</DialogTitle>
           </DialogHeader>

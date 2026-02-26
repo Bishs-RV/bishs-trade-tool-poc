@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { TradeData } from '@/lib/types'
 import { formatCurrency } from '@/lib/calculations'
 import ComparableTabs from './ComparableTabs'
@@ -10,7 +10,6 @@ interface Section3Props {
   data: TradeData
   onUpdate: (updates: Partial<TradeData>) => void
   isLocked: boolean
-  zipCode?: string | null
 }
 
 const EMPTY_METRICS: ComparablesMetrics = {
@@ -25,11 +24,11 @@ export default function Section3Market({
   data,
   onUpdate,
   isLocked,
-  zipCode,
 }: Section3Props) {
   const [listedUnits, setListedUnits] = useState<HistoricalComparable[]>([])
   const [soldUnits, setSoldUnits] = useState<HistoricalComparable[]>([])
   const [metrics, setMetrics] = useState<ComparablesMetrics>(EMPTY_METRICS)
+  const [displayMetrics, setDisplayMetrics] = useState<ComparablesMetrics>(EMPTY_METRICS)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -55,6 +54,9 @@ export default function Section3Market({
       if (data.manufacturerName) {
         params.set('manufacturer', data.manufacturerName)
       }
+      if (data.rvType) {
+        params.set('rvType', data.rvType)
+      }
 
       const response = await fetch(`/api/comparables?${params}`)
       if (!response.ok) {
@@ -73,7 +75,7 @@ export default function Section3Market({
     } finally {
       setIsLoading(false)
     }
-  }, [data.make, data.manufacturerName, data.model, data.year])
+  }, [data.make, data.manufacturerName, data.model, data.year, data.rvType])
 
   useEffect(() => {
     if (!isLocked) {
@@ -81,26 +83,29 @@ export default function Section3Market({
     }
   }, [fetchComparables, isLocked])
 
+  // Reset displayMetrics when source metrics change (new data fetch)
   useEffect(() => {
-    if (metrics.avgListedPrice !== null) {
-      onUpdate({ avgListingPrice: metrics.avgListedPrice })
+    setDisplayMetrics(metrics)
+  }, [metrics])
+
+  const onUpdateRef = useRef(onUpdate)
+  useEffect(() => { onUpdateRef.current = onUpdate }, [onUpdate])
+
+  useEffect(() => {
+    if (displayMetrics.avgListedPrice !== null) {
+      onUpdateRef.current({ avgListingPrice: displayMetrics.avgListedPrice })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [metrics.avgListedPrice])
+  }, [displayMetrics.avgListedPrice])
 
-  const generateRVTraderLink = () => {
-    const params = new URLSearchParams()
-
-    // RV Trader uses make for manufacturer, model for series/line, trim for model number
-    if (data.manufacturerName) params.set('make', data.manufacturerName)
-    if (data.make) params.set('model', data.make)
-    if (data.model) params.set('trim', data.model)
-    if (zipCode) {
-      params.set('zip', zipCode)
-      params.set('radius', '10000')
-    }
-
-    return `https://www.rvtrader.com/find-rvs-for-sale?${params.toString()}`
+  const generateGoogleSearchLink = () => {
+    const parts = [
+      data.year?.toString(),
+      data.manufacturerName,
+      data.make,
+      data.model,
+      'for sale'
+    ].filter(Boolean)
+    return `https://www.google.com/search?q=${encodeURIComponent(parts.join(' '))}`
   }
 
   return (
@@ -134,19 +139,19 @@ export default function Section3Market({
             <div className="bg-gray-50 rounded-lg p-2 text-center">
               <p className="text-xs text-gray-500">Avg Listed</p>
               <p className="text-sm font-bold text-gray-900">
-                {metrics.avgListedPrice !== null ? formatCurrency(metrics.avgListedPrice) : '----'}
+                {displayMetrics.avgListedPrice !== null ? formatCurrency(displayMetrics.avgListedPrice) : '----'}
               </p>
             </div>
             <div className="bg-gray-50 rounded-lg p-2 text-center">
               <p className="text-xs text-gray-500">Avg Sold</p>
               <p className="text-sm font-bold text-green-700">
-                {metrics.avgSoldPrice !== null ? formatCurrency(metrics.avgSoldPrice) : '----'}
+                {displayMetrics.avgSoldPrice !== null ? formatCurrency(displayMetrics.avgSoldPrice) : '----'}
               </p>
             </div>
             <div className="bg-gray-50 rounded-lg p-2 text-center">
               <p className="text-xs text-gray-500">Avg Days to Sale</p>
               <p className="text-sm font-bold text-gray-900">
-                {metrics.avgDaysToSale !== null ? `${metrics.avgDaysToSale}` : '----'}
+                {displayMetrics.avgDaysToSale !== null ? `${displayMetrics.avgDaysToSale}` : '----'}
               </p>
             </div>
           </div>
@@ -167,18 +172,19 @@ export default function Section3Market({
               soldUnits={soldUnits}
               metrics={metrics}
               isLoading={isLoading}
+              onMetricsChange={setDisplayMetrics}
             />
           </div>
 
-          {/* RV Trader Link */}
+          {/* Google Search Link */}
           <div className="mt-2 p-2 bg-gradient-to-r from-slate-50 to-gray-50 rounded-lg border border-slate-200 text-center hover:shadow-md transition-all">
             <a
-              href={generateRVTraderLink()}
+              href={generateGoogleSearchLink()}
               target="_blank"
               rel="noopener noreferrer"
               className="text-blue-700 hover:text-blue-900 font-bold underline text-sm flex items-center justify-center gap-2 transition-colors"
             >
-              <span>RV Trader Search for {data.year || ''} {data.manufacturerName || ''} {data.make || ''}</span>
+              <span>Google Search for {data.year || ''} {data.manufacturerName || ''} {data.make || ''}</span>
               <span>→</span>
             </a>
           </div>

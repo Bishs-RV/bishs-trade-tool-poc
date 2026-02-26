@@ -1,11 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { evoMajorunit, evoSalesdealdetail, evoSalesdealdetailunits, locationDetail } from '@/lib/db/schema'
-import { and, eq, gte, lte, ilike, sql, or, isNotNull, desc, asc } from 'drizzle-orm'
+import { and, eq, gte, lte, ilike, not, sql, or, isNotNull, desc, asc } from 'drizzle-orm'
 import type { ComparablesResponse, HistoricalComparable } from '@/lib/types/comparables'
 
 const DEFAULT_YEAR_RANGE = 1
 const MAX_YEAR_RANGE = 5
+
+// Map POC rvType codes to EVO class column values
+// EVO uses simplified codes: CAG/CAD → A, CCG/CCD → C
+const RV_TYPE_TO_EVO_CLASS: Record<string, string> = {
+  TT: 'TT',
+  FW: 'FW',
+  POP: 'POP',
+  TC: 'TC',
+  CAG: 'A',
+  CAD: 'A',
+  CCG: 'C',
+  CCD: 'C',
+  DT: 'DT',
+}
 
 const NOISE_WORDS = new Set([
   'series', 'by', 'inc', 'llc', 'corp', 'corporation', 'co', 'company',
@@ -49,6 +63,24 @@ function parseNumeric(value: string | null): number | null {
   return isNaN(parsed) ? null : parsed
 }
 
+function avgOf(values: number[]): number | null {
+  return values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : null
+}
+
+function buildMakeManufacturerFilter(
+  makeField: Parameters<typeof ilike>[0],
+  manufacturerField: Parameters<typeof ilike>[0],
+  makePattern: string | null,
+  manufacturerPattern: string | null,
+) {
+  return or(
+    makePattern ? ilike(makeField, makePattern) : undefined,
+    manufacturerPattern ? ilike(makeField, manufacturerPattern) : undefined,
+    makePattern ? ilike(manufacturerField, makePattern) : undefined,
+    manufacturerPattern ? ilike(manufacturerField, manufacturerPattern) : undefined,
+  )
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const make = searchParams.get('make')
@@ -56,10 +88,11 @@ export async function GET(request: NextRequest) {
   const manufacturer = searchParams.get('manufacturer')
   const yearStr = searchParams.get('year')
   const yearRangeStr = searchParams.get('yearRange')
+  const rvType = searchParams.get('rvType')
 
-  if (!model || !yearStr) {
+  if (!model || !yearStr || (!make && !manufacturer)) {
     return NextResponse.json(
-      { error: 'model and year are required' },
+      { error: 'model, year, and at least one of make/manufacturer are required' },
       { status: 400 }
     )
   }
@@ -76,6 +109,8 @@ export async function GET(request: NextRequest) {
   if (isNaN(yearRange) || yearRange < 0 || yearRange > MAX_YEAR_RANGE) {
     yearRange = DEFAULT_YEAR_RANGE
   }
+
+  const evoClass = rvType ? RV_TYPE_TO_EVO_CLASS[rvType] ?? null : null
 
   const minYear = year - yearRange
   const maxYear = year + yearRange
@@ -101,7 +136,10 @@ export async function GET(request: NextRequest) {
         listingDate: evoMajorunit.dateReceived,
         stockNumber: evoMajorunit.stockNumber,
         vin: evoMajorunit.vin,
-        daysOnLot: sql<number | null>`EXTRACT(DAY FROM NOW() - ${evoMajorunit.dateReceived})::INTEGER`.as('days_on_lot'),
+        newUsed: evoMajorunit.newUsed,
+        region: locationDetail.region,
+        unitClass: evoMajorunit.unitClass,
+        daysOnLot: sql<number | null>`(NOW()::date - ${evoMajorunit.dateReceived}::date)`.as('days_on_lot'),
       })
       .from(evoMajorunit)
       .leftJoin(
@@ -112,17 +150,13 @@ export async function GET(request: NextRequest) {
         and(
           // Flexible manufacturer/make matching - check both fields with both patterns
           // This handles cases where JD Power "Flagstaff by Forest River" maps to DB "FOREST RIVER" manufacturer + "FLAGSTAFF CLASSIC" make
-          or(
-            makePattern ? ilike(evoMajorunit.make, makePattern) : undefined,
-            manufacturerPattern ? ilike(evoMajorunit.make, manufacturerPattern) : undefined,
-            makePattern ? ilike(evoMajorunit.manufacturer, makePattern) : undefined,
-            manufacturerPattern ? ilike(evoMajorunit.manufacturer, manufacturerPattern) : undefined,
-          ),
+          buildMakeManufacturerFilter(evoMajorunit.make, evoMajorunit.manufacturer, makePattern, manufacturerPattern),
           sql`LOWER(REGEXP_REPLACE(${evoMajorunit.model}, '[^a-zA-Z0-9]', '', 'g')) LIKE ${modelPattern}`,
           gte(evoMajorunit.modelYear, minYear),
           lte(evoMajorunit.modelYear, maxYear),
           or(isNotNull(evoMajorunit.webPrice), isNotNull(evoMajorunit.dsrp)),
-          sql`${evoMajorunit.stockNumber} NOT ILIKE 'L%'`
+          not(ilike(evoMajorunit.stockNumber, 'L%')),
+          evoClass ? eq(evoMajorunit.unitClass, evoClass) : undefined,
         )
       )
       .orderBy(desc(evoMajorunit.modelYear), asc(locationDetail.location))
@@ -141,10 +175,13 @@ export async function GET(request: NextRequest) {
         listingDate: evoSalesdealdetailunits.dateReceived,
         stockNumber: evoSalesdealdetailunits.stocknumber,
         vin: evoSalesdealdetailunits.vin,
+        newUsed: evoSalesdealdetailunits.newused,
+        region: locationDetail.region,
+        unitClass: evoSalesdealdetailunits.unitClass,
         salesDealId: evoSalesdealdetailunits.salesDealId,
         soldDate: evoSalesdealdetail.deliveryDate,
         location: locationDetail.location,
-        daysToSale: sql<number | null>`EXTRACT(DAY FROM ${evoSalesdealdetail.deliveryDate} - ${evoSalesdealdetailunits.dateReceived})::INTEGER`.as('days_to_sale'),
+        daysToSale: sql<number | null>`(${evoSalesdealdetail.deliveryDate}::date - ${evoSalesdealdetailunits.dateReceived}::date)`.as('days_to_sale'),
       })
       .from(evoSalesdealdetailunits)
       .innerJoin(
@@ -158,17 +195,13 @@ export async function GET(request: NextRequest) {
       .where(
         and(
           // Flexible manufacturer/make matching - check both fields with both patterns
-          or(
-            makePattern ? ilike(evoSalesdealdetailunits.make, makePattern) : undefined,
-            manufacturerPattern ? ilike(evoSalesdealdetailunits.make, manufacturerPattern) : undefined,
-            makePattern ? ilike(evoSalesdealdetailunits.manufacturer, makePattern) : undefined,
-            manufacturerPattern ? ilike(evoSalesdealdetailunits.manufacturer, manufacturerPattern) : undefined,
-          ),
+          buildMakeManufacturerFilter(evoSalesdealdetailunits.make, evoSalesdealdetailunits.manufacturer, makePattern, manufacturerPattern),
           sql`LOWER(REGEXP_REPLACE(${evoSalesdealdetailunits.model}, '[^a-zA-Z0-9]', '', 'g')) LIKE ${modelPattern}`,
           gte(sql`CAST(${evoSalesdealdetailunits.year} AS INTEGER)`, minYear),
           lte(sql`CAST(${evoSalesdealdetailunits.year} AS INTEGER)`, maxYear),
           isNotNull(evoSalesdealdetailunits.unitSoldPrice),
-          sql`evo_salesdealdetail.stagename = 'Delivered'`
+          eq(evoSalesdealdetail.stageName, 'Delivered'),
+          evoClass ? eq(evoSalesdealdetailunits.unitClass, evoClass) : undefined,
         )
       )
       .orderBy(desc(sql`CAST(${evoSalesdealdetailunits.year} AS INTEGER)`), asc(locationDetail.location))
@@ -188,6 +221,9 @@ export async function GET(request: NextRequest) {
       daysOnLot: unit.daysOnLot,
       stockNumber: unit.stockNumber,
       vin: unit.vin,
+      newUsed: unit.newUsed ?? null,
+      region: unit.region ?? null,
+      unitClass: unit.unitClass ?? null,
     }))
 
     const soldUnits: HistoricalComparable[] = soldFromDealsRaw.map(unit => ({
@@ -202,29 +238,22 @@ export async function GET(request: NextRequest) {
       soldDate: unit.soldDate,
       listingDate: unit.listingDate,
       daysToSale: unit.daysToSale,
+      daysOnLot: null,
       stockNumber: unit.stockNumber,
       vin: unit.vin,
+      newUsed: unit.newUsed ?? null,
+      region: unit.region ?? null,
+      unitClass: unit.unitClass ?? null,
     }))
 
-    const listedPrices = listedUnits
-      .map(u => u.listedPrice)
-      .filter((p): p is number => p !== null)
-    const soldPrices = soldUnits
-      .map(u => u.soldPrice)
-      .filter((p): p is number => p !== null)
-    const daysToSaleValues = soldUnits
-      .map(u => u.daysToSale)
-      .filter((d): d is number => d !== null)
+    const listedPrices = listedUnits.map(u => u.listedPrice).filter((p): p is number => p !== null)
+    const soldPrices = soldUnits.map(u => u.soldPrice).filter((p): p is number => p !== null)
+    const daysToSaleValues = soldUnits.map(u => u.daysToSale).filter((d): d is number => d !== null)
 
-    const avgListedPrice = listedPrices.length > 0
-      ? listedPrices.reduce((a, b) => a + b, 0) / listedPrices.length
-      : null
-    const avgSoldPrice = soldPrices.length > 0
-      ? soldPrices.reduce((a, b) => a + b, 0) / soldPrices.length
-      : null
-    const avgDaysToSale = daysToSaleValues.length > 0
-      ? Math.round(daysToSaleValues.reduce((a, b) => a + b, 0) / daysToSaleValues.length)
-      : null
+    const avgListedPrice = avgOf(listedPrices)
+    const avgSoldPrice = avgOf(soldPrices)
+    const rawAvgDays = avgOf(daysToSaleValues)
+    const avgDaysToSale = rawAvgDays !== null ? Math.round(rawAvgDays) : null
 
     const response: ComparablesResponse = {
       listedUnits,
